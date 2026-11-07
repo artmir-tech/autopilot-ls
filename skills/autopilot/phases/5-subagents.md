@@ -138,4 +138,4 @@ In this order:
 
 ## When the build is over
 
-Every ticket is `done`, or `failed` with its dependents named to the user as waiting — point reviews included: none still running, every repair they asked for landed. Then `ap.py stage review` and `phases/6-review.md` — the whole-branch review.
+Every ticket is `done`, `awaiting_owner` (landed, its review page sent — `phases/5-prompts.md`), or `failed` with its dependents named to the user as waiting — point reviews included: none still running, every repair they asked for landed. An awaiting ticket does not hold the branch review; `finish` waits for it. Then `ap.py stage review` and `phases/6-review.md` — the whole-branch review.
