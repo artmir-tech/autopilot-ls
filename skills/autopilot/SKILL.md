@@ -36,6 +36,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | — | `phases/5-repair.md` — when a ticket comes back anything but a clean `DONE` | |
 | — | `phases/5-prompts.md` — at the first launch of a `Тип: prompt` ticket | prompts with versions, evals, A/B |
 | — | `phases/5-night.md` — instead of asking anything, when `/autopilot-ls night` started the session | the night queue flown, `night-<дата>.md` |
+| — | `phases/5-sessions.md` — *экспериментально*, only with `dispatch: sessions` set on the owner's words | executors as worker sessions, `board.json` |
 | — | `phases/9-memory.md` — also in Phase 5, when a ticket discovered something worth keeping | |
 | — | `phases/rationalizations.md` — on a failed gate, on catching yourself excusing something, once before the report | |
 

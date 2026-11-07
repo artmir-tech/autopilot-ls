@@ -835,6 +835,28 @@ class Run(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("сначала отчёт", out)
 
+    # ── форк autopilot-ls: воркеры-сессии ─────────────────────────────────
+    def test_sessions_dispatch_keeps_a_board_from_state_and_status_files(self):
+        self.plan()
+        self.ap("tickets")
+        self.ap("set", "dispatch=sessions")
+        self.ap("ticket", "02", "start", "--session", "local_abc", "--name", "t02-priem")
+        self.write("status/02.json", json.dumps({"ticket": "02", "status": "DONE", "branch": "ls/ticket-02-x1",
+                                                 "worktree": "/tmp/wt-02", "tests": "5 passed"}))
+        self.ap()
+        board = json.loads(read(os.path.join(self.dir, "board.json")))
+        row = {r["id"]: r for r in board["tickets"]}["02"]
+        self.assertEqual((row["session_id"], row["name"], row["status"]), ("local_abc", "t02-priem", "in-progress"))
+        self.assertEqual((row["worker_status"], row["branch"], row["worktree"]), ("DONE", "ls/ticket-02-x1", "/tmp/wt-02"))
+        self.assertTrue(row["lease_until"] > row["attempts"][0]["at"])
+        self.assertEqual(row["model"], "sonnet")
+
+    def test_no_board_without_sessions_dispatch(self):
+        self.plan()
+        self.ap("tickets")
+        self.ap("ticket", "02", "start")
+        self.assertFalse(os.path.exists(os.path.join(self.dir, "board.json")))
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

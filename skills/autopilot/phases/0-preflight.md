@@ -4,12 +4,13 @@ Configure the repo, pick the project memory, raise the instruments. Decide which
 
 | On disk | Case | What happens |
 |---|---|---|
-| `state.js` with `finishedAt: null`, `updatedAt` under five minutes old **and** the server in `.autopilot/serve.pid` answering | **the run is going on in another window** | nothing — say so in one line and ask which window carries on |
+| your own prompt says `role: worker` | **you are a worker of someone else's run** (`phases/5-sessions.md`) | no run at all — never start, resume or write `state.js`; follow the brief and `prompts/executor.md`, return the contract in your `status/NN.json` |
+| `state.js` with `finishedAt: null`, `updatedAt` under five minutes old **and** the server in `.autopilot/serve.pid` answering | **the run is going on in another window** | nothing — say so in one line and ask which window carries on. With `dispatch: sessions` the other windows are the run's own workers: only the orchestrator writes `state.js`, so there is never a second orchestrator to choose |
 | `state.js` with `finishedAt: null` | **resume** | read `phases/0-resume.md` and follow it instead of this file |
 | `state.js` with `finishedAt` set | **new feature in a configured repo** | everything below; `init` archives the finished run's state into its own directory |
 | no `.autopilot/state.js` | **new run** | everything below, in order |
 
-The first case needs both marks: two sessions writing one `state.js` overwrite each other, and the first to finish freezes the other's dashboard. One mark alone is an ordinary interruption — a resume.
+The «another window» case needs both marks: two sessions writing one `state.js` overwrite each other, and the first to finish freezes the other's dashboard. One mark alone is an ordinary interruption — a resume. A worker session is never that second writer: its first row stops it before it reads anything else.
 
 **«Доделай ещё вот это» for a flight that already landed**, continuing it rather than starting a new one: the new brief is a new dated file in the same run directory (`phases/1-manifest.md`), and `python3 .autopilot/ap.py reopen` puts the `--wip` back and reopens the stages from Требования. Phases 1–8 then run for the new brief: its requirements are appended to the manifest with the next free numbers, the spec is amended, new tickets are numbered after the last one — landed tickets stay landed. §5 below runs for it too: small fixes may have landed between the two briefs.
 

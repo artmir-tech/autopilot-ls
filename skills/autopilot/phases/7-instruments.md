@@ -62,6 +62,15 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 
 **«Окно лимитов» on a dashboard** would be two gauges — the window with its reset time, the week with the night's share marked — and the in-flight cap the verdict gives; the morning report's «Цифры» line is the same data in words.
 
+## Worker sessions — `dispatch`, `tickets[].session`, `board.json`
+
+| `state.js` | What | Written by |
+|---|---|---|
+| `dispatch` | `sessions` — executors start as worker sessions (`phases/5-sessions.md`); absent — subagents | `set dispatch=sessions`, on the owner's words |
+| `tickets[].session` | `{id, name, lease_until}` — the worker flying the ticket | `ticket 03 start --session <id> --name t03-intake` |
+
+While `dispatch` is `sessions`, every `ap.py` call also rewrites `.autopilot/<dir>/board.json` from `state.js` and the workers' `status/NN.json`. Nobody edits it by hand; workers never write it.
+
 ## Calibration
 
 After a run, `attempts` and `repairs` by `model` answer the one question the heuristic in `phases/4-plan.md` cannot: which kind of ticket the cheaper model really carries. The final report of the run does not show them; the next plan reads them from the archived `state.js`.

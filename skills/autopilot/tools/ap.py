@@ -346,7 +346,7 @@ LS_FIELDS = (("type", "Тип", ("code", "prompt", "migration", "e2e", "infra"))
              ("effort", "Усилие", ("low", "medium", "high", "xhigh")),
              ("attention", "Внимание", ("none", "review", "owner")))
 LADDER = [("haiku", "low"), ("sonnet", "medium"), ("opus", "high"), ("opus", "xhigh")]
-LS_KEEP = ("attempts", "gates", "base")
+LS_KEEP = ("attempts", "gates", "base", "session")
 
 
 def yes_no(v):
@@ -590,6 +590,44 @@ def cmd_pacing(state, pos, opt, multi):
                 for i in pos[1:] if i in known]
     log(state, "pacing", window=p.get("window_used_pct"), weekly=p.get("weekly_used_pct"))
     return pacing_verdict(state, p)
+
+
+# ── форк autopilot-ls: воркеры-сессии (phases/5-sessions.md, экспериментально) ──
+
+LEASE_HOURS = 2
+
+
+def record_session(state, tk, act, opt):
+    if act != "start" or not isinstance(opt.get("session"), str):
+        return
+    until = dt.datetime.fromisoformat(state["updatedAt"]) + dt.timedelta(hours=LEASE_HOURS)
+    tk["session"] = {"id": opt["session"], "name": opt.get("name") if isinstance(opt.get("name"), str) else None,
+                     "lease_until": until.isoformat(timespec="seconds")}
+
+
+def read_status(state, tid):
+    try:
+        return json.load(open(os.path.join(run_dir(state), "status", "%s.json" % tid), encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def write_board(state):
+    """Доска для режима dispatch: sessions — вне worktree воркеров, пишет только ap.py
+    оркестратора: учёт из state.js плюс то, что воркер сам сказал в status/NN.json."""
+    if state.get("dispatch") != "sessions" or not state.get("dir"):
+        return
+    rows = []
+    for t in state.get("tickets") or []:
+        s, st = t.get("session") or {}, read_status(state, t["id"])
+        rows.append({"id": t["id"], "status": t.get("status"), "worker_status": st.get("status"),
+                     "session_id": s.get("id"), "name": s.get("name"), "branch": st.get("branch"),
+                     "worktree": st.get("worktree"), "lease_until": s.get("lease_until"),
+                     "attempts": t.get("attempts") or [], "model": t.get("model"), "effort": t.get("effort")})
+    path = os.path.join(run_dir(state), "board.json")
+    with open(path + ".tmp", "w", encoding="utf-8") as f:
+        json.dump({"updatedAt": state["updatedAt"], "tickets": rows}, f, ensure_ascii=False, indent=2)
+    os.replace(path + ".tmp", path)
 
 
 def ls_night_record(state, act, ids):
@@ -1235,6 +1273,7 @@ def cmd_ticket(state, pos, opt):
     for i in ids:
         tk = known[i]
         notes.append(record_attempt(state, tk, act, opt))
+        record_session(state, tk, act, opt)
         tk["status"] = TICKET_STATUSES[act]
         if act == "start":
             tk.setdefault("startedAt", t)
@@ -1529,6 +1568,7 @@ def main():
     recount(state)
     notes = close_passed(state) + notes
     save(state)
+    write_board(state)
     snap = write_snapshot(state)
     if cmd == "finish" or opt.get("stop"):
         srv = stop_later()
