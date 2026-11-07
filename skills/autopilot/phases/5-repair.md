@@ -1,17 +1,17 @@
 # Phase 5 — Repair, failure and amendments
 
-Read only when a ticket comes back as anything other than a clean `DONE` — a `BLOCKING` finding, a red check, `BLOCKED`, `NEEDS_CONTEXT`, or a build that proved the plan wrong. Most tickets never open this file.
+Read only when a ticket comes back as anything other than a clean `DONE` — a `BLOCKING` finding, a red check, a red gate, `BLOCKED`, `NEEDS_CONTEXT`, or a build that proved the plan wrong. A `DONE_WITH_CONCERNS` does not bring you here by itself (`phases/5-subagents.md`, step 1). Most tickets never open this file.
 
 Two counters, both capped at two: `repairs` (дозапросы) and `retries` (fresh restarts). Running out of either means the cut was wrong, and that belongs in the report, not in another attempt. **`ap.py` enforces both**: a third `repair` or `retry` is refused, and so is anything but `reset --by-user` on a `failed` ticket. A refusal is the stop signal — never routed around: not by `reset`, not by a new ticket with the same goal, not by repairing «outside the books».
 
 ## Repair — two kinds, two addresses
 
-**Not every finding comes here.** Only the reviewer's `BLOCKING` lines and a red check become a дозапрос — and the дозапрос carries those lines **verbatim and nothing else**. `FINDINGS` go to `ap.py add concerns` and wait for the whole-branch review.
+**Not every finding comes here.** Only the reviewer's `BLOCKING` lines, a red check and a red gate become a дозапрос — and the дозапрос carries those lines **verbatim and nothing else**. `FINDINGS` go to `ap.py add concerns` and wait for the whole-branch review.
 
 | | Недоделка — could have, did not | Отказ — tried, could not |
 |---|---|---|
-| What | a red check, a blocking finding, a criterion met in letter and dodged in substance | `BLOCKED`, `NEEDS_CONTEXT`, a repair that already failed |
-| Goes to | **the same executor**, by message, its context intact — a **дозапрос** | **a fresh context**, on the strong model (below) |
+| What | a red check, a red gate, a blocking finding, a criterion met in letter and dodged in substance | `BLOCKED`, `NEEDS_CONTEXT`, a repair that already failed |
+| Goes to | **the same executor**, by message, its context intact, in its own worktree — a **дозапрос** | **a fresh context**, on the rung the ladder below names |
 | You send | the condition, nothing else | the ticket again, the error, the failing test named, the path now spelled out |
 | Because | it holds why the code is the way it is; a cold reader repairs the symptom and breaks the reason | its context *is* the failure — the same request gets the same answer |
 
@@ -39,7 +39,17 @@ Not a failure. If the dependency fits a decision the spec already made, add it t
 
 ## When a ticket fails
 
-`ap.py ticket NN retry`, then a fresh context with the error attached, on the strong model. A second retry only **with a changed approach** — a different design decision, a different library, a path the ticket now names explicitly; the same attempt with more hope is the one forbidden move.
+`ap.py ticket NN retry --model … --effort …`, then a fresh context with the error attached. A second retry only **with a changed approach** — a different design decision, a different library, a path the ticket now names explicitly; the same attempt with more hope is the one forbidden move.
+
+**The ladder** — `haiku·low → sonnet·medium → opus·high → opus·xhigh`. A failure that a fresh context and a changed approach did not cure is often a model that could not hold the problem; the changed approach therefore also gets a stronger head:
+
+| Attempt | Context | Rung |
+|---|---|---|
+| first launch | fresh | the ticket's `Модель` · `Усилие` |
+| retry 1 — the same goal, the error attached | fresh | the same rung — a new context is itself the change; a `haiku` ticket goes to `sonnet·medium`, since one failure says it was graded too low |
+| retry 2 — **a changed approach** | fresh | **one rung up** from the rung of retry 1 |
+
+Above `opus·xhigh` there is no rung: `max` only on the user's word, with its cost said in one line (the cost rule in `SKILL.md`). The rung goes into the `retry` call, so `state.js` keeps which model each attempt flew on — that record is how the next plan learns which tickets `sonnet` cannot carry. The fresh executor is told in one line what happened before it: «Две попытки до тебя упали на <причина>; теперь таск твой — и подход другой: <какой>».
 
 After that the flight stops for this ticket: `ap.py ticket NN fail --note "что блокирует"`, the reason in its manifest rows' Основание, and a plain sentence to the user — what is blocking, what you need from them, and which tickets are now waiting on it. Never improvise around a blocker and never narrow the ticket to whatever happened to work: a quietly reduced ticket is a lost requirement. Its wave-mates are independent by construction — let them land.
 

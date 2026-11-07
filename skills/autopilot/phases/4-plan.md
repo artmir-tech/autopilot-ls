@@ -138,7 +138,7 @@ Calibrate, do not trust: after two or three runs, `repairs` by model in `state.j
 
 ## Before the first ticket flies
 
-**`interfaces.md` carries more than the boundaries** Phase 3 wrote there. Add the project rules an executor cannot derive: stack and versions; how to install, run, and **one check command** — tests, types and lint together — plus how to run a single test file (ticket 01 creates the check command if the project has none); what must not be touched. **Ticket 01 installs every dependency «Решения по реализации» names**; any other one comes back from an executor as `BLOCKED` (`phases/5-repair.md`).
+**`interfaces.md` carries more than the boundaries** Phase 3 wrote there. Add the project rules an executor cannot derive: stack and versions; how to install — **in a fresh worktree**, since every executor gets one — run, and **one check command** — tests, types and lint together — plus how to run a single test file (ticket 01 creates the check command if the project has none); **the gates command**, `make gates CHANGED=1`, and the code standard, `docs/standards/ub-mode.md`; the test tiers L0 and L1 (`phases/8a-e2e.md`); what must not be touched. **Ticket 01 installs every dependency «Решения по реализации» names** and builds `make gates` to the contract in `standards/gates.md` (by path from `skillDir`, to its executor only); any other dependency comes back from an executor as `BLOCKED` (`phases/5-repair.md`).
 
 ## Gate G3, publishing, and the plan commit
 

@@ -12,19 +12,32 @@ Never two tickets in one context — accumulated context is what makes long sess
 
 | | |
 |---|---|
-| `prompts/executor.md` | by path (`skillDir` in `state.js`), **required reading before the first edit** — the testing contract, what is never allowed, the return format |
+| `prompts/executor.md` | by path (`skillDir` in `state.js`), **required reading before the first edit** — the testing contract, the code standards, what is never allowed, the return format |
+| `docs/standards/ub-mode.md` | by path in the project — the code standard `prompts/executor.md` makes binding, with its two exceptions |
+| the main checkout | its absolute path: the executor works in its own worktree, but reads `.autopilot/<dir>/` **from the main checkout** — `interfaces.md` grows during the build and is not committed until the end, so the worktree's copy is stale |
 | its ticket | by path; it already carries the verbatim brief quotes |
 | the spec sections the ticket names | `spec.md` by path **and section headings** — not the whole spec, not pasted |
 | `interfaces.md` | by path, read first |
 | `notes.md` | by path, in an existing codebase |
 | `reference.md` | by path, when the ticket builds something the user will look at |
-| the check command and how to run one test file | from `interfaces.md` — so it does not derive them |
+| the check command, how to run one test file, the gates command | from `interfaces.md` — so it does not derive them |
+| its log file | `.autopilot/<dir>/logs/NN.md` in the main checkout — ub-mode's log goes there, the contract carries only the path |
 | its zone, and what it must not touch | zones of tickets flying beside it included |
 | credentials | variable **names**, never a value |
 
 A subagent has a filesystem; pasting what it can read writes the same words twice into the bill, and the second copy stays in your context for the rest of the run. Every rule the executor must follow travels in its prompt or in `prompts/executor.md` — a rule that lives only in a phase file does not exist for the one writing the code.
 
-**The model.** A ticket marked `Модель: сильная` runs on the session's model. `обычная` runs on a cheaper one — in Claude Code, `model: "sonnet"` on the Agent call; a harness without a model choice ignores this silently. A ticket that already failed once is relaunched on the strong model.
+**The model, the effort and the worktree go into the call.** The ticket's `Модель` and `Усилие` are passed as they are — the skill requires it, which is what the Agent tool's `effort` asks for — and every executor gets its own git worktree:
+
+```
+Agent({ description: "T03 приём заявки", subagent_type: "general-purpose",
+        model: "sonnet", effort: "medium", isolation: "worktree",
+        prompt: "<пути, зона, команды, контракт — таблица выше>" })
+```
+
+A relaunch after a failure takes the rung `phases/5-repair.md` names, not the ticket's. `ap.py ticket NN start` records the model and effort the ticket flies on; a harness without a model, effort or worktree choice ignores the field silently — and without worktrees the run falls back to the shared tree, below.
+
+**A worktree per executor.** Parallel executors in one checkout break each other's checks and leak into each other's commits; with `isolation: "worktree"` each writes only its own copy, and the main checkout holds nothing but landed tickets. The worktree is a fresh checkout: no `.venv`, no `node_modules`, no `.env` — the executor installs dependencies there first (the command is in `interfaces.md`), and tests never need `.env` (cassettes, `phases/8a-e2e.md`). Worktrees live under `.claude/worktrees/`, which `.gitignore` carries from Phase 0. The executor names its worktree and branch in the contract (`WORKTREE:`), so landing never depends on what the harness prints.
 
 **Dependencies.** Ticket 01 installs everything the spec's «Решения по реализации» names. A later ticket that needs something else returns `BLOCKED` with its name; if it fits a decision already made, add it to «Решения», relaunch that ticket with permission to install exactly that — the manifest and lock files join its commit — and fly nothing else that installs at the same time.
 
@@ -40,7 +53,7 @@ Phase 4 gave every ticket a wave and a zone. **Launch a whole wave in one messag
 - **One event, one message.** Every call of yours re-reads your whole context — at 200K, one call costs about as much as a small subagent's first steps. What one event needs goes out together: the `ap.py` mark, the commit, the next launch, the line to the user. Never a call that only marks, then a call that only launches.
 - **Waiting for the wave is ending your turn** — a background subagent wakes you when it returns. Never spawn an agent, or run a loop, just to wait.
 
-**One working tree, several writers.** Parallel executors share the checkout. Each touches only its zone (and `.env.example`), and you commit by zone. A check that fails **only in files of zones still being written** is a neighbour's unfinished work, not this ticket's defect: the ticket may land on its own tests green, and the full check runs again when the neighbour lands.
+**Without worktrees — the fallback, not the plan.** A harness that cannot isolate puts parallel executors in one checkout. Each touches only its zone (and `.env.example`), you commit exactly the contract's `FILES`, and a check that fails **only in files of zones still being written** is a neighbour's unfinished work, not this ticket's defect: the ticket may land on its own tests green, and the full check runs again when the neighbour lands. Steps 3 and 7 below then run in the main checkout, with no rebase and no merge.
 
 ## The return contract
 
@@ -48,13 +61,16 @@ Required in the prompt, not suggested — without it you cannot update anything:
 
 ```
 STATUS: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+WORKTREE: <абсолютный путь> · <ветка>
 FILES: созданные и изменённые — только пути
 TESTS: команда проверки → результат и сколько было до тебя (`npm run check` → 34 passed, было 21)
+GATES: crap max 7.4 · dry 0 пар ≥0.8 · mutants 38/41 убито, выжившие: <имена>
 REDPROOF: новый тест → чем он падал до кода (одна строка на тест, до пяти)
 INTERFACES: публичные сигнатуры, схемы, форматы событий, которые ты выставил
 REQUIREMENTS: R01 done | R01.1 placeholder — <чего не хватило>
 CONCERNS: что сделано с оговоркой и почему
 BLOCKERS: чего не хватило (зависимость, решение, доступ)
+LOG: .autopilot/<папка>/logs/NN.md
 ```
 
 **No more than 25 lines, no code, no diffs, no account of the work.** A block longer than that is not read: ask for it again in one line — an essay skimmed once is re-read on every remaining turn of your context.
@@ -64,24 +80,39 @@ BLOCKERS: чего не хватило (зависимость, решение, 
 In this order:
 
 1. **Read the contract and its status.** No block → the ticket is not finished; ask for it. `BLOCKED` or `NEEDS_CONTEXT` → `phases/5-repair.md` now. A `CONCERNS` line saying the plan does not hold — a data model, an interface, two requirements colliding — is the build contradicting the plan: `phases/5-repair.md` too. Two `NEEDS_CONTEXT` in one run mean the tickets are too thin across the board.
-2. **Nothing outside the zone.** `git status --porcelain`: a changed file outside this ticket's zone, `.env.example` and the zones still in flight is a дозапрос — put it back or say why it had to change.
-3. **Append its `INTERFACES` to `interfaces.md`** — you, never the executors; parallel writers collide. Two returns claiming one interface is a plan defect: keep the one that fits and re-cut the other.
-4. **Run the check**, full, truncated: `<check> 2>&1 | tail -30`, **and read it before anything else happens** — green or red, the names of what failed, and the count. Compare the count with the contract: a `DONE` that added criteria and no tests is a дозапрос, and a suite reporting zero tests is red however it exits.
-5. **Red → `phases/5-repair.md`.** Nothing is committed on red, and nothing is repaired by you.
-6. **Commit and record — one call, only its zone:**
+
+   **`DONE_WITH_CONCERNS` is a `DONE` with entries in the ledger, not a repair.** The ticket goes through every step below like a `DONE`; each `CONCERNS` line becomes `ap.py add concerns "T03 · <файл:строка> — …"` in step 10, and the whole-branch review confirms or drops it. A concern never blocks the commit by itself. Two exceptions, both already routed: a concern that one of the ticket's own requirements is not fully done → point review (step 9); a concern that the plan does not hold → `phases/5-repair.md`.
+2. **Nothing outside `FILES`, nothing missing from it.** `git -C "$WT" status --porcelain`: a changed path outside this ticket's zone and `.env.example` is a дозапрос — put it back or say why it had to change; a changed path inside the zone that `FILES` does not name is a дозапрос too — it would be left out of the commit.
+3. **Commit in the worktree — exactly `FILES`, never `-A`**, then bring it up to the main branch:
 
    ```bash
-   git add -A -- src/bot/ tests/bot/ .env.example && git commit -qm "T03: приём заявки" \
-     --trailer "Autopilot-Run: 2026-10-10-repair-bot" --trailer "Requirements: R01, R02" -- src/bot/ tests/bot/ .env.example \
-     && python3 .autopilot/ap.py ticket 03 done --tests 34/0 --commit "$(git rev-parse --short HEAD)"
+   WT=<путь из WORKTREE>; BR=<ветка из WORKTREE>; MAIN=$(git branch --show-current)
+   git -C "$WT" add -- <FILES> && git -C "$WT" commit -qm "T03: приём заявки" \
+     --trailer "Autopilot-Run: 2026-10-10-repair-bot" --trailer "Requirements: R01, R02" -- <FILES> \
+     && git -C "$WT" rebase -q "$MAIN"
    ```
 
-   **`done` without `--commit` is refused, and git refusing the commit is never worked around** — `index.lock`, `Permission denied`, a sandbox error: that is the machine, so `phases/5-repair.md`, «Fail early». The `&&` stays: a ticket is done when its commit exists.
+   The commit happens here, in the executor's branch, so that the check runs on exactly what will land. A rebase conflict means two tickets wrote one file — a plan defect: `git -C "$WT" rebase --abort`, then `phases/5-repair.md`.
+4. **Append its `INTERFACES` to `interfaces.md`** — you, never the executors; parallel writers collide. Two returns claiming one interface is a plan defect: keep the one that fits and re-cut the other.
+5. **Run the check**, full, truncated, in the worktree: `(cd "$WT" && <check> 2>&1 | tail -30)`, **and read it before anything else happens** — green or red, the names of what failed, and the count. Compare the count with the contract: a `DONE` that added criteria and no tests is a дозапрос, and a suite reporting zero tests is red however it exits.
+6. **Then the gates**, on the same tree: `(cd "$WT" && make gates CHANGED=1 BASE="$(git rev-parse "$MAIN")" 2>&1 | tail -15)`. A red gate — CRAP ≥ 10, a duplicate pair ≥ 0.8, a surviving mutant, a red build, typecheck or lint — **is `BLOCKING`**: it goes back as a дозапрос with the gate's lines verbatim, like a red test. Gates that disagree with the contract's `GATES` line are a дозапрос too: the executor reported a run it did not do. Until a ticket has built `make gates` (ticket 01 or the first `infra` ticket, `standards/gates.md` in the skill), this step is skipped with one line in the log; after it, never.
+7. **Red check or red gate → `phases/5-repair.md`.** Nothing lands on red, and nothing is repaired by you. The executor repairs in its own worktree; its fix joins the same commit — `git -C "$WT" add -- <FILES> && git -C "$WT" commit -q --amend --no-edit -- <FILES>` — because the branch has not landed yet. After step 8 it never is amended again.
+8. **Land and record — one call:**
 
-   The paths are every path of its zone that exists, plus `.env.example` if the ticket changed it — git refuses a path that matches nothing; `--tests` is what step 4 actually printed; `--placeholder R05` for each row the contract reports as a stub. One commit per ticket — the user's rollback points. **The trailers make the history searchable after the run is gone**: `Autopilot-Run` is `dir` without `--wip` (ticket numbers restart every run, so `T03` alone names several tickets), `Requirements` the ticket's rows. `git log --grep="R02"` then finds every change a requirement ever caused.
-7. **Point review, if the ticket says `Ревью: да`**, or the contract reports one of its requirements as not done: `ap.py ticket NN review`, the reviewer in the background, and straight on to the next step and the next wave (`phases/6-review.md`). Its `BLOCKING` lines, when they come, go to `phases/5-repair.md`.
-8. **The ledger.** Each stub the contract names → `ap.py add debt.placeholders`; each new variable → `add debt.emptyEnv NAME`; each `A##` that reached the code → `add additions`; each `CONCERNS` line about craft → `add concerns`. Project memory only if something was discovered (`phases/9-memory.md`, Moment 2) — most tickets add nothing.
-9. **One plain line to the user**: «Бот принимает заявки — 3 из 8 готово».
+   ```bash
+   git merge -q --ff-only "$BR" \
+     && python3 .autopilot/ap.py ticket 03 done --tests 34/0 --gates "crap 7.4 · dry 0 · mutants 38/41" \
+        --commit "$(git rev-parse --short HEAD)"
+   ```
+
+   **`done` without `--commit` is refused, and git refusing the commit is never worked around** — `index.lock`, `Permission denied`, a sandbox error: that is the machine, so `phases/5-repair.md`, «Fail early». The `&&` stays: a ticket is done when its commit is in the main branch. `--ff-only` refused means the main branch moved since step 3: rebase again, steps 5–6 again, then land. Never a merge commit.
+
+   `<FILES>` are the contract's paths, plus `.env.example` if the ticket changed it; `--tests` and `--gates` are what steps 5 and 6 actually printed; `--placeholder R05` for each row the contract reports as a stub. One commit per ticket — the user's rollback points. **The trailers make the history searchable after the run is gone**: `Autopilot-Run` is `dir` without `--wip` (ticket numbers restart every run, so `T03` alone names several tickets), `Requirements` the ticket's rows. `git log --grep="R02"` then finds every change a requirement ever caused.
+
+   The worktree stays while a point review or its repair may still need the executor; when the ticket is finished — `git worktree remove "$WT" && git branch -q -d "$BR"`.
+9. **Point review, if the ticket says `Ревью: да`**, or the contract reports one of its requirements as not done: `ap.py ticket NN review`, the reviewer in the background, and straight on to the next step and the next wave (`phases/6-review.md`). Its `BLOCKING` lines, when they come, go to `phases/5-repair.md`.
+10. **The ledger.** Each stub the contract names → `ap.py add debt.placeholders`; each new variable → `add debt.emptyEnv NAME`; each `A##` that reached the code → `add additions`; each `CONCERNS` line → `add concerns`. Project memory only if something was discovered (`phases/9-memory.md`, Moment 2) — most tickets add nothing.
+11. **One plain line to the user**: «Бот принимает заявки — 3 из 8 готово».
 
 **Two tickets returning together are processed one at a time**, each through the whole list: one commit each, a check after each — otherwise a red has two possible authors.
 
