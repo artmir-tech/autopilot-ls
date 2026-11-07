@@ -19,7 +19,20 @@ Every piece of user text — the brief, every answer, every pasted fragment — 
 | Private key | `-----BEGIN … PRIVATE KEY-----` |
 | Generic | ≥32 chars of hex or base64 next to `key`, `token`, `secret`, `password`, `ключ`, `токен`, `пароль`, `доступ` |
 
-On a hit: replace the value with `[REDACTED:<VAR_NAME>]` (the conventional name — `STRIPE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `DATABASE_URL`); add the name to `.env.example` with an empty value; tell the user in one plain line — «Ты прислал ключ Stripe — я его не сохранил. Впиши его сам в `.env`, а этот лучше отзови и выпусти новый: он уже побывал в переписке»; carry on. **Never echo the value**, not even to confirm what you found. Before the first commit — the plan commit at the end of Phase 4 — run the gate over all of `.autopilot/`.
+**Personal data — the gate's second half, for fixtures.** In «Легко Сказать» the test bench is real people telling real stories: dialogues, extracted JSON dossiers, cassettes of the model's answers to them. Nothing of it reaches a commit as it is — not in `tests/`, `evals/`, `prompts/` few-shot, `.autopilot/`, a ticket's quote:
+
+| Kind | Shape | Becomes |
+|---|---|---|
+| Name, surname, patronymic | a capitalised Russian or Latin name in a dialogue, a dossier field `name` | «Автор-1», «Клиент-2» |
+| Phone | `+7…`, `8 9…`, ten or more digits with separators | `+7 900 000-00-01` |
+| Telegram handle, e-mail | `@…`, `…@…` | `@user_1`, `user1@example.com` |
+| Company, workplace, brand | a dossier's `company`, «работаю в …» | «Компания-1» |
+| City, address, school | a dossier's `city`, «живу в …» | «Город-1» |
+| Dates that identify | a birthday, a dated life event | the year only, or «[дата]» |
+
+**Consistent pseudonyms within a file**, so a dialogue still reads as one person's; **the mapping never committed** — it stays on the owner's machine or nowhere. The scan is regexes for the shapes above plus the list of names the corpus itself carries; the anonymising is done by the executor of the ticket that brings the corpus in (`Тип: e2e`), and `make pd-scan` joins its check. **You run the same scan** over `.autopilot/` before the plan commit, beside the secrets, and over the brief before it is written: a name from a test dialogue quoted into the brief becomes «Автор-1» there too, with one line to the owner — «В задаче были имена из тестовых диалогов — в файлах заменил на псевдонимы».
+
+On a secret's hit: replace the value with `[REDACTED:<VAR_NAME>]` (the conventional name — `STRIPE_SECRET_KEY`, `TELEGRAM_BOT_TOKEN`, `DATABASE_URL`); add the name to `.env.example` with an empty value; tell the user in one plain line — «Ты прислал ключ Stripe — я его не сохранил. Впиши его сам в `.env`, а этот лучше отзови и выпусти новый: он уже побывал в переписке»; carry on. **Never echo the value**, not even to confirm what you found. Before the first commit — the plan commit at the end of Phase 4 — run the gate over all of `.autopilot/`.
 
 ## 2. The brief file
 

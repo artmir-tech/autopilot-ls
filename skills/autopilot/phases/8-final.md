@@ -57,6 +57,10 @@ Record it in one call — `ap.py blind checked=N matched=M --mismatch "…" --mi
 
 **One round of fixes, then the report — never a third look.** Every 🔴 a ticket can fix goes into **one** ticket, `F2` — built like `F1` (`phases/6-review.md`): the drifted rows as its criteria, verbatim, one executor, one commit. Then **one** more blind check, given only the drifted rows. What still drifts goes to `ap.py add report` and into «Открытые вопросы», plainly. `ap.py blind` refuses a third call: each new look finds something new, and «ещё один круг» is how a run spends a day on acceptance. A 🔴 caused by the machine and not the code — a timeout, a native module, a port, a service that is not up — is not for `F2`: it goes to «Что нужно от тебя». **A build nobody has launched is a build nobody has seen work** — if it cannot be run here at all, that goes to «Что нужно от тебя», not into the accepted column.
 
+## 1a. E2E — the replay of real dialogues
+
+**Read `phases/8a-e2e.md` now**, after the blind verdict is recorded and before the memory agent goes out. Its L2 run is skipped with one line when `E2E_MAX_USD` is empty or the run has no dialogue corpus; its `E1` ticket, when there is one, flies before the report. The full mutation run (`make gates` without `CHANGED`) is not run here: it is a night job (`phases/5-night.md`), and its survivors reach the next report as concerns.
+
 ## 2. Memory and ADRs
 
 **Read `phases/9-memory.md` before spawning them** — Moments 3 and 4 there are their whole brief, the glossary included. When the memory file is the user's own, the memory agent writes `memory-proposal.md` instead of touching it.

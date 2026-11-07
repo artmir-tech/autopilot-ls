@@ -630,6 +630,25 @@ def write_board(state):
     os.replace(path + ".tmp", path)
 
 
+# ── форк autopilot-ls: e2e L2 (phases/8a-e2e.md) ───────────────────────────
+
+def cmd_e2e(state, pos, multi):
+    """Прогон L2 — числа целиком или ничего, как у blind: пропавшее число — не ноль."""
+    d = {}
+    for p in pos:
+        k, eq, v = p.partition("=")
+        if not eq or k not in ("dialogues", "passed", "usd"):
+            die("e2e dialogues=N passed=M usd=X [--regression \"…\"]")
+        d[k] = num(v)
+    if set(d) != {"dialogues", "passed", "usd"}:
+        die("e2e: нужны все три — dialogues=N passed=M usd=X")
+    d.update(regressions=multi.get("regression", []), at=state["updatedAt"])
+    state["e2e"] = d
+    log(state, "e2e", n=d["dialogues"], ok=d["passed"])
+    return ["L2: %s из %s, $%s%s" % (d["passed"], d["dialogues"], d["usd"],
+                                    " · регрессий %d" % len(d["regressions"]) if d["regressions"] else "")]
+
+
 def ls_night_record(state, act, ids):
     n = state.get("night") or {}
     if n.get("status") != "running" or act not in ("done", "fail"):
@@ -1535,6 +1554,8 @@ def main():
             notes += cmd_night(state, rest, opt)
         elif cmd == "pacing":
             notes += cmd_pacing(state, rest, opt, multi)
+        elif cmd == "e2e":
+            notes += cmd_e2e(state, rest, multi)
         elif cmd == "tickets":
             notes.append(publish_tickets(state))
             log(state, "tickets", n=len(state.get("tickets") or []))

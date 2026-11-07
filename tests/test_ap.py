@@ -857,6 +857,19 @@ class Run(unittest.TestCase):
         self.ap("ticket", "02", "start")
         self.assertFalse(os.path.exists(os.path.join(self.dir, "board.json")))
 
+    # ── форк autopilot-ls: e2e L2 ──────────────────────────────────────────
+    def test_e2e_records_an_l2_run_and_its_regressions(self):
+        self.init()
+        code, out = self.ap("e2e", "dialogues=12", "passed=11", "usd=3.4",
+                            "--regression", "d07 — коуч задал 14 вопросов при 5–10")
+        self.assertEqual(code, 0, out)
+        e = self.state()["e2e"]
+        self.assertEqual((e["dialogues"], e["passed"], e["usd"]), (12, 11, 3.4))
+        self.assertEqual(e["regressions"], ["d07 — коуч задал 14 вопросов при 5–10"])
+        self.assertIn("L2: 11 из 12", out)
+        code, out = self.ap("e2e", "dialogues=12")
+        self.assertNotEqual(code, 0)
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

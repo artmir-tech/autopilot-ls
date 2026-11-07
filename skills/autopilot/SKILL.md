@@ -31,7 +31,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | 4 Plan | `phases/4-plan.md`, then `phases/7-instruments.md` before `ap.py tickets` | `tickets/NN-*.md` with type, model, effort, attention, night; the plan commit |
 | 5 Build | `phases/5-subagents.md` | code, one commit per ticket |
 | 6 Review | `phases/6-review.md` — at the first point review, and for the whole-branch review | reviewed code |
-| 8 Final | `phases/8-final.md`, and `phases/9-memory.md` before spawning | blind acceptance, memory, progress file, report |
+| 8 Final | `phases/8-final.md`, then `phases/8a-e2e.md` after the blind verdict, and `phases/9-memory.md` before spawning the memory agent | blind acceptance, e2e replay, memory, progress file, report |
 | — | `phases/0-resume.md` — instead of preflight, when resuming | |
 | — | `phases/5-repair.md` — when a ticket comes back anything but a clean `DONE` | |
 | — | `phases/5-prompts.md` — at the first launch of a `Тип: prompt` ticket | prompts with versions, evals, A/B |
