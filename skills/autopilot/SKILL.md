@@ -54,6 +54,20 @@ Phase names here are English and never shown. In the chat, on the dashboard and 
 
 **«Сборка» — весь прогон**, поэтому пятый этап — «Разработка». **Единица работы — «таск»**: «задача» — это то, что поставил пользователь.
 
+The fork adds no stage — the e2e replay is part of «Приёмка», the night and the pacing are ways of running «Разработка» — and the dashboard still knows eight. What it adds the user does see, **one Russian word each**, never the English id:
+
+| Fork concept | Пользователю |
+|---|---|
+| `night` · `queue` | Ночь · Ночная очередь |
+| `pacing` | Окно лимитов |
+| gates (`make gates`) | Проверки качества |
+| `Тип: prompt` | промпт-таск |
+| L2 replay with a judge | Прогон диалогов |
+| `Внимание: owner` · `review` | нужно от тебя · посмотри |
+| method (`[МЕТОДИКА — подтверди]`) | методика |
+| `dispatch: sessions` | сессии-исполнители |
+| `program` · its row | Программа · прогон программы |
+
 ## The flight
 
 Two dials, decided once in Phase 0 (`phases/0-modes.md`): **the mode** — `full`, `semi` (default), `interview`, `manual`; **the depth** — `strict`, normal (default), `deep`.

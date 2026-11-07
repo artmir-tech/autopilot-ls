@@ -85,6 +85,19 @@ While `dispatch` is `sessions`, every `ap.py` call also rewrites `.autopilot/<di
 
 `state.js` → `e2e`: `{dialogues, passed, usd, regressions, at}` of the last L2 run, from `ap.py e2e dialogues=12 passed=11 usd=3.4 --regression "…"` (`phases/8a-e2e.md`).
 
+## The morning report — the same data in words
+
+`night-<YYYY-MM-DD>.md` (`phases/5-night.md`) is written from `state.js`, re-read at the end of the night, never from memory of it:
+
+| Раздел | From |
+|---|---|
+| Сделано | `night.done` → each ticket's title, `tests`, `gates` — what became possible, in the user's words |
+| Упало | `night.failed` → the ticket's `concerns`; `night.stop`; the dependents left untouched (`queue.skipped` «ждёт …») |
+| Нужно от тебя | `queue.dropped` and `queue.skipped` with the owner's reasons; tickets with `attention: owner` still pending; `attention: review` landed tonight («посмотри»); a `waiting` left open |
+| Цифры | `pacing.window_used_pct` at start and end, `pacing.weekly_used_pct − night.weekly_at_start` against `night_weekly_max_pct`, counts of done / failed / waiting; `e2e` if L2 ran |
+
+Words from the table in `SKILL.md`: «Окно», «Проверки качества», «Прогон диалогов» — never `pacing`, gates or L2.
+
 ## Calibration
 
 After a run, `attempts` and `repairs` by `model` answer the one question the heuristic in `phases/4-plan.md` cannot: which kind of ticket the cheaper model really carries. The final report of the run does not show them; the next plan reads them from the archived `state.js`.
