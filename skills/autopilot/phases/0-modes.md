@@ -2,7 +2,7 @@
 
 Read in Phase 0 with `phases/0-preflight.md`. Both dials are decided once, from what the user typed, announced in one block, and only *applied* from then on.
 
-Everything after `/autopilot` splits into **the mode** (`full`, `semi`, `interview`, `manual`), **the depth** (`strict`, `deep`) and **the brief** — everything else. Bare words, any order, both optional; anything unrecognised is brief. `/autopilot full deep интернет-магазин керамики` — full mode, deep elaboration.
+Everything after `/autopilot-ls` splits into **the mode** (`full`, `semi`, `interview`, `manual`), **the depth** (`strict`, `deep`) and **the brief** — everything else. Bare words, any order, both optional; anything unrecognised is brief. `/autopilot-ls full deep интернет-магазин керамики` — full mode, deep elaboration. The word `night` («ночной режим») is not a mode: it resumes a run in the night queue (`phases/5-night.md`), and only a scheduled task says it.
 
 ## Mode — how much the user is asked
 
@@ -43,7 +43,7 @@ Once, before Phase 1, together with the dashboard and the memory file. **A hint,
 Режим: полуавтомат · глубина: обычная — спрошу только то, что в задаче не определено, дальше соберу сам.
 Дашборд открыл — обновляется сам: http://localhost:PORT/dashboard.html
 Память проекта — AGENTS.md (+ CLAUDE.md со ссылкой).
-↑ Вышла версия Autopilot 2.2.2 (у тебя 2.2.1): npx skills update autopilot -g   ← только если init её напечатал
+↑ В upstream вышла версия Autopilot 2.2.4 (форк на 2.2.3) — влить в autopilot-ls вручную   ← только если init её напечатал
 
 Можно переключить в любой момент, просто скажи:
 • «полный автомат» — не спрашиваю вообще ничего

@@ -1,15 +1,18 @@
 ---
-name: autopilot
-description: Builds an app, site, bot, or feature end-to-end from a dictated idea — requirements, briefing, spec, tickets, subagents, review, acceptance — with a live dashboard, for users who expect a finished result without reviewing specs or code. Starts only on /autopilot; a bare /autopilot resumes an interrupted run.
+name: autopilot-ls
+description: Форк Autopilot для «Легко Сказать» — builds an app, bot or feature end-to-end from a dictated idea (requirements, briefing, spec, tickets, subagents, review, acceptance) with a live dashboard; adds a model and effort per ticket, ub-mode with deterministic gates, prompt tickets with evals, a night queue, token pacing, worker sessions, an e2e phase with an LLM judge and a program of several runs. Starts only on /autopilot-ls; a bare /autopilot-ls resumes an interrupted run.
 disable-model-invocation: true
-argument-hint: "[full|semi|interview|manual] [strict|deep] что нужно построить или путь к brief.md"
+argument-hint: "[full|semi|interview|manual] [strict|deep] [night] что нужно построить или путь к brief.md"
 metadata:
-  version: "2.2.3"
+  version: "2.2.3-ls.1"
+  upstream: "nick-vels/skills@5ed4b79 (Autopilot 2.2.3)"
 ---
 
-# Autopilot
+# Autopilot-ls
 
-Autopilot flies a dictated idea from words to a working project **in one dialogue**, without making the user approve each stage. Every rule it needs lives in `phases/` and `prompts/`; no other skill has to be installed.
+Autopilot-ls flies a dictated idea from words to a working project **in one dialogue**, without making the user approve each stage. Every rule it needs lives in `phases/` and `prompts/`; the only outside file is the project's own copy of ub-mode, `docs/standards/ub-mode.md`, which executors read (`prompts/executor.md`).
+
+**A fork of Autopilot 2.2.3 for «Легко Сказать»** — what differs and why is in `CHANGES-ls.md` at the root of the skill's repository. It coexists with an installed `autopilot`: the trigger is `/autopilot-ls`, and the instruments are always copied from this skill's own directory (`phases/0-instruments.md`).
 
 **The order is the product.** Code is written in the second-to-last phase. Everything before it decides *what* to build; everything after it proves the right thing got built.
 

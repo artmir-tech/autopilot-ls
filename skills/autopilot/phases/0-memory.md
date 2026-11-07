@@ -42,9 +42,10 @@ Written before anything is built, so an interrupted run still leaves something t
 
 ## Как здесь работает Autopilot
 
-Сборка ведётся навыком `/autopilot`. Требования, спецификация и таски — в `.autopilot/`.
+Сборка ведётся навыком `/autopilot-ls`. Требования, спецификация и таски — в `.autopilot/`.
 Прогресс — `.autopilot/dashboard.html`. Требование из `manifest.md` может снять
-только пользователь. Прерванную сборку продолжает «продолжи автопилот».
+только пользователь. Прерванную сборку продолжает `/autopilot-ls` без слов.
+Стандарт кода — `docs/standards/ub-mode.md`; гейты — `make gates`.
 
 ### Правка без автопилота
 

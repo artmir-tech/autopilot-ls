@@ -9,7 +9,7 @@ Runs on every flight — new repo, new feature, resume alike. Every line is idem
 ```bash
 A=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)/.autopilot
 TPL=$(find -L ~/.claude/skills ~/.agents/skills ~/.claude/plugins .claude/skills .agents/skills \
-        -maxdepth 6 -name dashboard-template.html 2>/dev/null | head -1)
+        -maxdepth 6 -path '*autopilot-ls/phases/dashboard-template.html' 2>/dev/null | head -1)
 [ -n "$TPL" ] && TPL=$(cd "$(dirname "$TPL")" && pwd -P)/dashboard-template.html
 command -v cygpath >/dev/null && TPL=$(cygpath -m "$TPL")   # Windows: C:/…, а не /c/…
 echo "skillDir = ${TPL%/phases/*}"
@@ -18,7 +18,8 @@ cp "${TPL%/phases/*}/tools/ap.py" "$A/ap.py"
 ```
 
 - **`skillDir` is what every subagent contract hangs on** — `prompts/executor.md` and `prompts/review.md` go down as paths built from it. It goes into `init` below and lives in `state.js`, never only in your context.
-- `find -L` and no `*` in it: skills are installed through symlinks, which a plain `find` does not follow, and an unmatched glob aborts the whole line in zsh. Empty output → widen the search once by hand and carry on.
+- `find -L` and no unquoted `*` in it: skills are installed through symlinks, which a plain `find` does not follow, and an unmatched glob aborts the whole line in zsh. Empty output → widen the search once by hand and carry on.
+- **The path filter is the fork's**: an installed upstream `autopilot` has a template and an `ap.py` too, and the upstream `ap.py` does not know the fork's ticket fields, queue and pacing. Never copy from a directory that is not `autopilot-ls`.
 - **`python3` not a working interpreter** — on Windows it can be the Microsoft Store stub → use `python` or `py -3` wherever this skill says `python3`.
 - `index.html` is a symlink so the server answers `/` with the dashboard instead of a directory listing.
 - Never regenerate the template, never read it into context, never edit it.
@@ -29,11 +30,12 @@ cp "${TPL%/phases/*}/tools/ap.py" "$A/ap.py"
 python3 .autopilot/ap.py init --slug telegram-repair-bot --title "Телеграм-бот для заявок на ремонт" \
   --mode semi --depth normal --memory-file AGENTS.md --memory-owner autopilot \
   --skill-dir "<skillDir>" --check-update
+python3 .autopilot/ap.py ls-check      # форк на месте: ub-mode в репо, make gates, поля тасков
 ```
 
 It creates the run directory `<YYYY-MM-DD>-<slug>--wip/` with `tickets/` inside, writes `state.js` with all eight stages (`preflight` active), adds the run's row to `.autopilot/README.md` (writing the file on a new repo), puts `.autopilot/serve.*` into `.gitignore`, raises the server and prints its address. A finished run's `state.js` is archived into that run's directory first; an unfinished one means this is a resume, and `init` refuses (`phases/0-resume.md`).
 
-A line starting with **`↑`** means a newer Autopilot is out: put it into the opening block as it is — one line, not a question, never an update mid-run.
+A line starting with **`↑`** means upstream Autopilot moved past the version this fork is built on: put it into the opening block as it is — one line, not a question, never an update mid-run, never `npx skills update` (it would install upstream, not the fork).
 
 ## 3. Open it once, yourself
 

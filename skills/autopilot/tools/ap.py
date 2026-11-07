@@ -692,9 +692,11 @@ def check_update(state):
     home = _norm(os.path.expanduser("~"))
     flag = " -g" if _norm(skill).startswith(home + "/.") else ""
     v = lambda t: ".".join(map(str, t))
-    return ("вышла версия Autopilot %s (у тебя %s): npx skills update autopilot%s · "
-            "что нового — github.com/%s/blob/main/CHANGELOG.md"
-            % (v(remote), v(local) if local else "без номера", flag, REPO))
+    # Форк autopilot-ls: обновление upstream не ставится поверх, а вливается в форк руками.
+    del flag
+    return ("в upstream вышла версия Autopilot %s (форк autopilot-ls основан на %s) — "
+            "влить в форк вручную, что нового — github.com/%s/blob/main/CHANGELOG.md"
+            % (v(remote), v(local) if local else "без номера", REPO))
 
 
 # ── реестр прогонов (.autopilot/README.md) ──────────────────────────────────
@@ -712,7 +714,7 @@ README_TEXT = """# Как читать эту папку
 - `PROGRESS.md` — что осталось после последней сборки: не доделано, известные баги,
   о чём договорились. Мелкие правки без автопилота дописываются сюда же.
 
-Если сборка прервалась — скажи агенту «продолжи автопилот», он поднимет состояние отсюда.
+Если сборка прервалась — набери `/autopilot-ls` без слов, агент поднимет состояние отсюда.
 
 ## Прогоны
 
