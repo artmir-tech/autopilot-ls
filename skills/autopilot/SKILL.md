@@ -33,6 +33,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | 6 Review | `phases/6-review.md` — at the first point review, and for the whole-branch review | reviewed code |
 | 8 Final | `phases/8-final.md`, then `phases/8a-e2e.md` after the blind verdict, and `phases/9-memory.md` before spawning the memory agent | blind acceptance, e2e replay, memory, progress file, report |
 | — | `phases/0-resume.md` — instead of preflight, when resuming | |
+| — | `phases/0-program.md` — when `.autopilot/program.md` exists, or the work is over the T3 ceiling | `program.md`, the next run picked |
 | — | `phases/5-repair.md` — when a ticket comes back anything but a clean `DONE` | |
 | — | `phases/5-prompts.md` — at the first launch of a `Тип: prompt` ticket | prompts with versions, evals, A/B |
 | — | `phases/5-night.md` — instead of asking anything, when `/autopilot-ls night` started the session | the night queue flown, `night-<дата>.md` |
@@ -106,6 +107,7 @@ Binding on every phase; the phases do not restate it.
 │   └── tickets/NN-<slug>.md
 ├── README.md        how to read this folder, and the register of runs
 ├── PROGRESS.md       where the work stands between runs — read by the next run and by plain sessions
+├── program.md       the program — several runs and their dependencies, when one run is not enough
 ├── state.js         the run state — written only by ap.py
 ├── ap.py            one call per event: state, dashboard, server
 ├── dashboard.html   the human view; carries a snapshot of the state

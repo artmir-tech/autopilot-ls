@@ -10,4 +10,5 @@ Read only when `.autopilot/state.js` exists with `finishedAt: null` and no other
 6. **A `waiting` left in `state.js`** is a question from the interrupted session. Ask it again if it is still open, or `ap.py answered` if the dialogue shows the answer.
 7. **Run the project's check once** before the next launch. Red → name the failure in the next executor's prompt, so it does not read someone else's breakage as its own.
 8. **Continue from the frontier** — the current phase, or the next launchable tickets.
-9. **Started as `/autopilot-ls night`** — steps 1–7 without a single question (a `waiting` stays for the morning report), then `phases/5-night.md` instead of step 8.
+9. **A run of a program** (`program` in `state.js`) resumes as itself — the program row stays `in-flight` until `finish` lands it. Only after that does `/autopilot-ls` move on to the next row (`phases/0-program.md`).
+10. **Started as `/autopilot-ls night`** — steps 1–7 without a single question (a `waiting` stays for the morning report), then `phases/5-night.md` instead of step 8.

@@ -71,6 +71,20 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 
 While `dispatch` is `sessions`, every `ap.py` call also rewrites `.autopilot/<dir>/board.json` from `state.js` and the workers' `status/NN.json`. Nobody edits it by hand; workers never write it.
 
+## The program — `program` and `.autopilot/program.md`
+
+| Where | What | Written by |
+|---|---|---|
+| `state.js` → `program` | the row this run delivers, `P02` | `init --program P02` |
+| `program.md`, the row's status | `in-flight` at `init`, `landed` at `finish`; `blocked` / `pending` by command | `init`, `finish`, `program P05 block --note "…"`, `program P05 pending` |
+| `program.md`, «Папка» · «Итог» | the run's directory; its `--result` | `init`, `finish` |
+
+`ap.py program` prints the next runnable row and what waits; it reads no `state.js` and writes nothing.
+
+## The e2e result — `e2e`
+
+`state.js` → `e2e`: `{dialogues, passed, usd, regressions, at}` of the last L2 run, from `ap.py e2e dialogues=12 passed=11 usd=3.4 --regression "…"` (`phases/8a-e2e.md`).
+
 ## Calibration
 
 After a run, `attempts` and `repairs` by `model` answer the one question the heuristic in `phases/4-plan.md` cannot: which kind of ticket the cheaper model really carries. The final report of the run does not show them; the next plan reads them from the archived `state.js`.

@@ -16,7 +16,7 @@
 | ~3–6K | 2 | **T1** |
 | ~6–18K | 3–6, one per ~3K | **T2** |
 | ~18–36K | 7–12, one per ~3K | **T3** |
-| more | **not allowed** — split into two runs | |
+| more | **not allowed** — split into runs: `phases/0-program.md` | |
 
 **T0 is the default for a list of edits in existing code** — eighteen fixes across a codebase are usually under 3K lines, however many files they touch. The executor works through them in one context, like a single dialogue, and the whole-branch review checks the result.
 

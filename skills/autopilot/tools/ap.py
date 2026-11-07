@@ -649,6 +649,74 @@ def cmd_e2e(state, pos, multi):
                                     " · регрессий %d" % len(d["regressions"]) if d["regressions"] else "")]
 
 
+# ── форк autopilot-ls: программа прогонов (phases/0-program.md) ────────────
+
+PROGRAM = os.path.join(A, "program.md")
+PROGRAM_ROW = re.compile(r"^\|\s*P\d+\s*\|")
+
+
+def program_lines():
+    try:
+        return open(PROGRAM, encoding="utf-8").read().splitlines()
+    except OSError:
+        return None
+
+
+def program_rows(lines):
+    rows = []
+    for i, line in enumerate(lines):
+        if PROGRAM_ROW.match(line):
+            c = [x.strip() for x in cells_of(line)] + [""] * 6
+            rows.append({"i": i, "id": c[0], "title": c[1], "deps": re.findall(r"P\d+", c[2]),
+                         "status": c[3], "dir": c[4].strip("`"), "result": c[5]})
+    return rows
+
+
+def program_set(pid, status, d=None, result=None):
+    """Строка программы меняется только здесь: статус, папка прогона, итог."""
+    lines = program_lines()
+    if lines is None:
+        return "! программы нет — .autopilot/program.md"
+    hit = [r for r in program_rows(lines) if r["id"] == pid]
+    if not hit:
+        return "! в программе нет %s" % pid
+    r = hit[0]
+    lines[r["i"]] = "| %s | %s | %s | %s | %s | %s |" % (
+        r["id"], r["title"], ", ".join(r["deps"]) or "—", status,
+        "`%s`" % d if d else (("`%s`" % r["dir"]) if r["dir"] not in ("", "—") else "—"),
+        result or r["result"] or "—")
+    with open(PROGRAM, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    return "программа: %s → %s" % (pid, status)
+
+
+def cmd_program(pos, opt):
+    lines = program_lines()
+    if lines is None:
+        die("программы нет — .autopilot/program.md пишется по phases/0-program.md")
+    if len(pos) >= 2 and pos[1] in ("block", "pending"):
+        if pos[1] == "block" and not isinstance(opt.get("note"), str):
+            die("program P03 block --note \"что блокирует\"")
+        return [program_set(pos[0], "blocked" if pos[1] == "block" else "pending",
+                            result=opt.get("note") if isinstance(opt.get("note"), str) else None)]
+    rows = program_rows(lines)
+    landed = {r["id"] for r in rows if r["status"] == "landed"}
+    out, nxt = [], None
+    for r in rows:
+        if r["status"] == "blocked":
+            out.append("%s blocked — %s" % (r["id"], r["result"]))
+        elif r["status"] == "pending":
+            wait = [d for d in r["deps"] if d not in landed]
+            if wait:
+                out.append("%s ждёт %s" % (r["id"], ", ".join(wait)))
+            elif nxt is None:
+                nxt = r
+    head = ("следующий: %s — %s" % (nxt["id"], nxt["title"])) if nxt else (
+        "программа сдана" if rows and all(r["status"] == "landed" for r in rows) else "следующего нет")
+    flying = [r["id"] for r in rows if r["status"] == "in-flight"]
+    return [head] + (["в работе: " + ", ".join(flying)] if flying else []) + out
+
+
 def ls_night_record(state, act, ids):
     n = state.get("night") or {}
     if n.get("status") != "running" or act not in ("done", "fail"):
@@ -1193,6 +1261,9 @@ def cmd_init(opt):
     state = fresh_state(opt)
     log(state, "init")
     os.makedirs(os.path.join(run_dir(state), "tickets"), exist_ok=True)
+    if isinstance(opt.get("program"), str):
+        state["program"] = opt["program"]
+        notes.append(program_set(opt["program"], "in-flight", d=state["dir"]))
     save(state)
     ensure_gitignore()
     register_row(state, "в работе", None)
@@ -1471,6 +1542,8 @@ def cmd_finish(state, opt):
     state["result"] = opt.get("result") if isinstance(opt.get("result"), str) else None
     register_row(state, "сдан с оговорками" if problems else "сдан", state["result"])
     log(state, "finish", result=state["result"], problems=len(problems))
+    if state.get("program"):
+        notes.append(program_set(state["program"], "landed", d=state["dir"], result=state["result"]))
     return notes
 
 
@@ -1529,6 +1602,10 @@ def main():
     pos, opt, multi = parse_args(argv)
     cmd = pos[0] if pos else ""
     notes = []
+    if cmd == "program":                 # программа живёт между прогонами: state.js ей не нужен
+        for line in cmd_program(pos[1:], opt):
+            print("  " + (line if line.startswith("!") else "· " + line))
+        return
     if cmd == "init":
         state, notes = cmd_init(opt)
     else:

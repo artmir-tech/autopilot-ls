@@ -870,6 +870,43 @@ class Run(unittest.TestCase):
         code, out = self.ap("e2e", "dialogues=12")
         self.assertNotEqual(code, 0)
 
+    # ── форк autopilot-ls: программа прогонов ──────────────────────────────
+    PROGRAM = """# Программа
+
+| ID | Прогон | Зависит от | Статус | Папка | Итог |
+|----|--------|------------|--------|-------|------|
+| P01 | Ядро и БД | — | landed | `2026-11-01-core` | ядро есть |
+| P02 | Промпты стадий 1–3 | P01 | pending | — | — |
+| P03 | Telegram-канал | P02 | pending | — | — |
+| P04 | Фокус-группа | P01 | blocked | — | ждёт методику |
+"""
+
+    def write_program(self):
+        with open(os.path.join(self.a, "program.md"), "w", encoding="utf-8") as f:
+            f.write(self.PROGRAM)
+
+    def test_program_names_the_next_run_whose_parents_landed(self):
+        self.write_program()                         # до первого прогона state.js ещё нет
+        code, out = self.ap("program")
+        self.assertEqual(code, 0, out)
+        self.assertIn("следующий: P02 — Промпты стадий 1–3", out)
+        self.assertIn("P03 ждёт P02", out)
+        self.assertIn("P04 blocked — ждёт методику", out)
+
+    def test_a_run_of_the_program_marks_its_row_from_init_to_finish(self):
+        self.write_program()
+        code, out = self.ap("init", "--slug", "prompts", "--title", "Промпты", "--skill-dir", SKILL,
+                            "--program", "P02")
+        self.assertEqual(code, 0, out)
+        s = self.state()
+        self.assertEqual(s["program"], "P02")
+        prog = read(os.path.join(self.a, "program.md"))
+        self.assertRegex(prog, r"\| P02 \|[^\n]*\| in-flight \| `%s` \|" % re.escape(s["dir"]))
+        self.ap("finish", "--result", "промпты 1–3 на месте", "--by-user", "«сдавай»")
+        prog = read(os.path.join(self.a, "program.md"))
+        self.assertRegex(prog, r"\| P02 \|[^\n]*\| landed \| `[^`]*prompts` \| промпты 1–3 на месте \|")
+        self.assertIn("следующий: P03", self.ap("program")[1])
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""
