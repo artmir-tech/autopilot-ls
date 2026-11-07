@@ -35,6 +35,8 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `night.status` | `running` → `stopped` (first `failed`, or the pacing stop) → `finished` | `night start · stop · end`, `ticket … fail` |
 | `night.done` · `night.failed` | what landed and what failed tonight | `ticket … done · fail` while the night runs |
 | `night.stop` · `night.report` | why it stopped; the morning report's file name | `night stop`, `ticket … fail`, `night end` |
+| `night.resume_at` | while `paused`: when the window resets + 5 minutes | `pacing`, at 85 % |
+| `night.date` · `startedAt` · `endedAt` | the night's bounds | `night start`, `night end` |
 
 | Event | Call |
 |---|---|
@@ -58,7 +60,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `source` · `at` | `get_usage` or `measure-run`; when it was read | `pacing --source` |
 | `night.weekly_at_start` | the weekly percent when the night began — what the night's share is counted from | `night start` |
 
-`ap.py pacing` prints the verdict — in flight at most 3 / 2 / none, the room for one ticket, and at 85 % the time to continue; `pacing check 03 05` answers per ticket. At night it also pauses the night at 85 % of the window and stops it at the weekly share.
+`ap.py pacing` prints the verdict — in flight at most 3 / 2 / none, the room for one ticket, and at 85 % the time to continue; `pacing check 03 05` answers per ticket. At night it also pauses the night at 85 % of the window and stops it at the weekly share. **Once `pacing` has numbers, `ticket … start · retry` refuse** a launch at 85 % or more, and a `start` that would put more tickets in flight (`in-progress`, `repair`) than the window allows — stale numbers are fixed by a fresh `get_usage` and `pacing`, never by going around the refusal.
 
 **«Окно лимитов» on a dashboard** would be two gauges — the window with its reset time, the week with the night's share marked — and the in-flight cap the verdict gives; the morning report's «Цифры» line is the same data in words.
 

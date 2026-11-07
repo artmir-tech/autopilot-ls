@@ -60,7 +60,7 @@ The subscription's limits are the run's real budget: a run that hits the 5-hour 
 
 1. **`mcp__ccd_session_mgmt__get_usage`** — the 5-hour window (percent used, reset time) and the weekly limit. Load it with ToolSearch once if it is only listed as deferred.
 2. **`ap.py pacing --window 41 --reset <ISO> --weekly 22 --source get_usage`** — writes `state.js` → `pacing` and prints the verdict; `ap.py pacing check 03 05` says, per ticket, whether its estimate fits.
-3. **Launch only what the verdict allows**:
+3. **Launch only what the verdict allows** — `ap.py ticket … start` refuses the rest:
    - a ticket starts only if its estimate is **≤ 0.8 of the room left** — `100 − window − reserve`, the reserve **15 %** for reviews and repairs of what is already flying;
    - the window **over 60 % — at most two in flight**, not three;
    - **at 85 % — no new launches**: let the flying tickets land (or reset them at the frontier, `phases/0-resume.md`), `ap.py` once more so the dashboard holds, and **a one-off scheduled task «продолжить» at the reset time + 5 minutes** — `create_scheduled_task({fireAt: <то, что напечатал ap.py>, prompt: "/autopilot-ls\nПроект: <абсолютный путь>. Окно лимитов сброшено — продолжи прогон с фронтира. Если команда не сработала — прочитай ~/.claude/skills/autopilot-ls/SKILL.md и следуй ему."})`, only with the owner's standing permission (`phases/5-night.md`, «Starting it»); without it, one line to the user with the time to say `/autopilot-ls`.

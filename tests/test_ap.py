@@ -907,6 +907,19 @@ class Run(unittest.TestCase):
         self.assertRegex(prog, r"\| P02 \|[^\n]*\| landed \| `[^`]*prompts` \| промпты 1–3 на месте \|")
         self.assertIn("следующий: P03", self.ap("program")[1])
 
+    def test_pacing_refuses_launches_over_the_window_and_the_flight_cap(self):
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("pacing", "--window", "70")
+        code, out = self.ap("ticket", "02", "03", "04", "start")
+        self.assertNotEqual(code, 0)
+        self.assertIn("в полёте было бы 3, окно 70 % позволяет 2", out)
+        self.assertEqual(self.ap("ticket", "02", "03", "start")[0], 0)
+        self.ap("pacing", "--window", "90")
+        code, out = self.ap("ticket", "04", "start")
+        self.assertIn("окно 90 % — новых запусков нет", out)
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

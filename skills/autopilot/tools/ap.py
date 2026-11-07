@@ -717,6 +717,26 @@ def cmd_program(pos, opt):
     return [head] + (["в работе: " + ", ".join(flying)] if flying else []) + out
 
 
+IN_FLIGHT = ("in-progress", "repair")
+
+
+def ls_pacing_guard(state, act, ids):
+    """Окно ≥85 % — запусков нет; иначе в полёте не больше, чем окно позволяет (3 или 2).
+    Цифры устарели — сначала get_usage и `pacing`, а не обход отказа."""
+    p = state.get("pacing") or {}
+    used = p.get("window_used_pct")
+    if used is None or act not in ("start", "retry"):
+        return
+    if used >= WINDOW_STOP:
+        die("окно %s %% — новых запусков нет: летящие довести, продолжить после сброса. "
+            "Окно уже сброшено — свежие цифры: get_usage → `pacing --window …`" % used)
+    cap = 2 if used > WINDOW_TWO else 3
+    flying = {t["id"] for t in state.get("tickets") or [] if t.get("status") in IN_FLIGHT}
+    total = len(flying | set(ids))
+    if act == "start" and total > cap:
+        die("в полёте было бы %d, окно %s %% позволяет %d — запусти меньше" % (total, used, cap))
+
+
 def ls_night_record(state, act, ids):
     n = state.get("night") or {}
     if n.get("status") != "running" or act not in ("done", "fail"):
@@ -1354,6 +1374,7 @@ def cmd_ticket(state, pos, opt):
     by_user = opt.get("by-user") if isinstance(opt.get("by-user"), str) else None
     t = now()
     ls_night_guard(state, act, ids)
+    ls_pacing_guard(state, act, ids)
     for i in ids:                                    # сначала все отказы — потом запись
         tk = known.get(i)
         if tk is None:
