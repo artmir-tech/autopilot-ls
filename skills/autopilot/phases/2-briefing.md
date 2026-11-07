@@ -35,6 +35,7 @@ Before each round goes out: `ap.py ask briefing --note "три вопроса �
 | **interview · manual** | all of them, plus everything the adversarial pass opened |
 
 - **Everything else you decide yourself** — error wording, retry policy, defaults, naming, layout — in every mode. But a decision goes back to the user, not to you, if it **costs money or ties them to a vendor**, **changes what they see or can do**, **means rebuilding rather than editing to undo**, or **encodes a rule about their business** — prices, deadlines, who may do what, what happens to someone's data. Unsure which side it falls on → ask.
+- **Method is a business rule — always the owner's.** In a coaching product the method *is* the product: what the coach asks and in what order, how many questions a stage holds, the structure of the drafts (W1–W3), when a stage counts as done, the wording of a prompt, a rubric's criteria. None of it is yours to decide, at any depth: a question to the owner in semi, interview and manual — with your recommendation taken **from the owner's own materials** (the skill, the old prompts, the test dialogues), never from what coaching usually looks like. In full it becomes `ASSUMPTION — методика, принято за владельца: …` in Основание, taken from those materials verbatim where they say it, and a visible `[МЕТОДИКА — подтверди]` mark where they do not. **Inventing method is inventing a fact about the user** (rule 3). A ticket that builds on an open or assumed method gets `Внимание: owner` and never flies at night (`phases/4-plan.md`).
 - **Nothing open → say so and go:** «Вопросов нет — в задаче всё однозначно, пишу спецификацию», and `ap.py stage briefing skip --note "вопросов не потребовалось"`.
 
 Calibration, not a target: semi usually lands at one or two rounds; interview and manual at three to six on a real project. What makes an interview bad is padding, never length. Say once, if it will be long, that it will be — and do not apologise for the count as you go.
@@ -82,7 +83,7 @@ After each round, update the manifest rows at once: a decision into Основа
 No interview: `ap.py stage briefing skip --note "полный автомат — самобрифинг"`. Run the same list against yourself and write the answers into the manifest.
 
 - **Decisions are yours** — stack, structure, provider, data model, layout. Pick what runs on the user's machine **without a third-party account and without money**, and record `ASSUMPTION — принято за пользователя: …` in Основание, plus `ap.py add debt.assumptions "…"` for the dashboard; every one is a line in the report.
-- **Facts about the user are not** — prices, texts, addresses, business rules, brand colours: the missing fact named in Основание, a visibly labelled stub in the code (`[ЦЕНА — впиши]`, never `4990 ₽`), a line in the report.
+- **Facts about the user are not** — prices, texts, addresses, business rules, brand colours, **and method** (above): the missing fact named in Основание, a visibly labelled stub in the code (`[ЦЕНА — впиши]`, never `4990 ₽`; `[МЕТОДИКА — подтверди]`, never a plausible question list), a line in the report.
 - **A paid or account-bound service becomes an adapter** — one interface, a local stub behind it, the credential an empty name in `.env.example`.
 
 ## Closing
