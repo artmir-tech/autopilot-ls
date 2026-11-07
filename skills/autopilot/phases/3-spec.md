@@ -107,7 +107,7 @@ Which section covers which requirement lives in the manifest's «Где» column
 
 **1. Your own pass.** Every manifest row: `open` → `in-spec` with its section in «Где», or → `deferred` with its «Вне рамок» line. **Zero `open`**, or the spec is incomplete — write the missing section.
 
-**2. The independent coverage check** — the half that works. You wrote the spec, so you cannot see what you did not write. Spawn a subagent with **exactly the named files** — every `*-brief.md` in `dir`, oldest first, and `spec.md` — never the manifest (your reading of the brief), the conversation or a summary; and tell it not to go looking, because the files sit in `.autopilot/` beside the manifest:
+**2. The independent coverage check** — the half that works. You wrote the spec, so you cannot see what you did not write. Spawn a subagent, `model: "opus"`, with **exactly the named files** — every `*-brief.md` in `dir`, oldest first, and `spec.md` — never the manifest (your reading of the brief), the conversation or a summary; and tell it not to go looking, because the files sit in `.autopilot/` beside the manifest:
 
 > Открой только названные файлы и больше ничего — ни `manifest.md`,
 > ни остальное содержимое `.autopilot/`. Твоя ценность в том, что ты

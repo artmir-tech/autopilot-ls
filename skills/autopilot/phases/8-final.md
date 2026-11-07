@@ -4,7 +4,7 @@
 
 | Agent | Question | Receives | Never receives |
 |---|---|---|---|
-| blind checker | что из брифа сделано | the brief files, the repository | `spec.md`, `manifest.md`, tickets |
+| blind checker · `opus` | что из брифа сделано | the brief files, the repository | `spec.md`, `manifest.md`, tickets |
 | ADR *(T2+)* | почему сделано именно так и как здесь называются вещи | `spec.md`, `manifest.md`, `interfaces.md`, `notes.md` | the repo |
 | memory | как этим пользоваться завтра | the repo, the memory file, `interfaces.md`, the tier, the commands the checker ran | `spec.md`, tickets |
 
