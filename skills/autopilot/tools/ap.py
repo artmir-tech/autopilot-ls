@@ -423,9 +423,14 @@ def queue_skip_reason(t, by, queued, dropped):
     if t.get("status") not in (None, "pending"):
         return "в работе"
     for b in t.get("blockedBy") or []:
-        if (by.get(b) or {}).get("status") != "done" and b not in queued:
+        if not landed(by.get(b) or {}) and b not in queued:
             return "ждёт %s" % b
     return None
+
+
+def landed(tk):
+    """Влит и не в ремонте: сдан, или на точечном ревью с коммитом — на нём уже строят."""
+    return tk.get("status") == "done" or (tk.get("status") == "review" and bool(tk.get("commit")))
 
 
 def build_queue(state):

@@ -21,7 +21,7 @@ Never two tickets in one context — accumulated context is what makes long sess
 | `notes.md` | by path, in an existing codebase |
 | `reference.md` | by path, when the ticket builds something the user will look at |
 | the check command, how to run one test file, the gates command | from `interfaces.md` — so it does not derive them |
-| its log file | `.autopilot/<dir>/logs/NN.md` in the main checkout — ub-mode's log goes there, the contract carries only the path |
+| its log file | `.autopilot/<dir>/logs/NN.md` **inside its worktree** — the harness lets an executor write nowhere else; ub-mode's log goes there uncommitted, the contract carries only the path, and you move it at landing |
 | its zone, and what it must not touch | zones of tickets flying beside it included |
 | credentials | variable **names**, never a value |
 
@@ -101,7 +101,7 @@ In this order:
 1. **Read the contract and its status.** No block → the ticket is not finished; ask for it. `BLOCKED` or `NEEDS_CONTEXT` → `phases/5-repair.md` now. A `CONCERNS` line saying the plan does not hold — a data model, an interface, two requirements colliding — is the build contradicting the plan: `phases/5-repair.md` too. Two `NEEDS_CONTEXT` in one run mean the tickets are too thin across the board.
 
    **`DONE_WITH_CONCERNS` is a `DONE` with entries in the ledger, not a repair.** The ticket goes through every step below like a `DONE`; each `CONCERNS` line becomes `ap.py add concerns "T03 · <файл:строка> — …"` in step 10, and the whole-branch review confirms or drops it. A concern never blocks the commit by itself. Two exceptions, both already routed: a concern that one of the ticket's own requirements is not fully done → point review (step 9); a concern that the plan does not hold → `phases/5-repair.md`.
-2. **Nothing outside the zone, nothing left behind.** Everything the branch changed — `git -C "$WT" diff --name-only "$MAIN"...HEAD` and `git -C "$WT" status --porcelain` — lies inside this ticket's zone or is `.env.example`; a path outside it is a дозапрос: put it back or say why it had to change. A changed path inside the zone that `FILES` does not name is a дозапрос too — the contract is how the next tickets learn what exists.
+2. **Nothing outside the zone, nothing left behind.** Everything the branch changed — `git -C "$WT" diff --name-only "$MAIN"...HEAD` and `git -C "$WT" status --porcelain` — lies inside this ticket's zone or is `.env.example`; the one untracked path allowed outside it is the executor's log, `.autopilot/<dir>/logs/NN.md`, which you move into the main checkout now — `mkdir -p .autopilot/<dir>/logs && mv "$WT/.autopilot/<dir>/logs/NN.md" .autopilot/<dir>/logs/`; a path outside it is a дозапрос: put it back or say why it had to change. A changed path inside the zone that `FILES` does not name is a дозапрос too — the contract is how the next tickets learn what exists.
 3. **Close the branch — exactly `FILES`, never `-A`.** The executor commits as it goes, in small commits on its own branch (ub-mode, «Commit and Push»); whatever it left uncommitted you commit by name, then bring the branch up to the main one:
 
    ```bash

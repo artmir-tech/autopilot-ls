@@ -978,6 +978,18 @@ class Run(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("неделя 95 % — новых запусков нет", out)
 
+    def test_queue_builds_on_a_parent_under_point_review(self):
+        """Таск на точечном ревью уже влит — следующие строятся на нём (phases/6-review.md)."""
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("ticket", "01", "review")
+        self.ap("queue")
+        self.assertEqual(self.state()["queue"]["tickets"], ["02", "03", "04"])
+        self.ap("ticket", "01", "repair", "--note", "ключ схемы")
+        self.ap("queue")
+        self.assertIn({"id": "02", "why": "ждёт 01"}, self.state()["queue"]["skipped"])
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""
