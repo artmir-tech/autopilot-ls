@@ -51,7 +51,7 @@ Everything else waits for the whole-branch review. **You do not widen the list**
 
 After the build: `ap.py stage review`.
 
-**First the gates over the whole run**: `make gates CHANGED=1 BASE=<baseCommit> 2>&1 | tail -15` — after every executor has landed, alone on the machine, with `LS_GATES_JOBS` workers (`standards/gates.md`, «Нагрузка на машину»). Red lines go straight into `F1` as criteria — they are facts, not findings, and no reviewer is spent on them. The full mutation run without `CHANGED` is a night job (`phases/5-night.md`), not this step.
+**First the gates over the whole run**: `make gates CHANGED=1 BASE=<baseCommit> 2>&1 | tail -15` — after every executor has landed, alone on the machine, with `MUTATE_WORKERS` workers (`standards/gates.md`, «Нагрузка на машину»). Red lines go straight into `F1` as criteria — they are facts, not findings, and no reviewer is spent on them. The full mutation run without `CHANGED` is a night job (`phases/5-night.md`), not this step.
 
 **Two fresh subagents, in parallel, one message** — the axes split, because merged they mask each other and because Craft is the half the gates already narrowed:
 

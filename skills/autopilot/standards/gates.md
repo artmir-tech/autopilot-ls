@@ -49,30 +49,30 @@ gates: gates-wait
 	@uv run pytest -q --cov=src --cov-report=xml >/dev/null
 	@./tools/gates/crapper --use-existing-coverage --threshold 10 $(SCOPE)
 	@./tools/gates/dryer --threshold 0.8 $(SCOPE)
-	@./tools/gates/mutator --use-existing-coverage --max-workers $(LS_GATES_JOBS) --test-command "uv run pytest -q -x" $(SCOPE)
+	@./tools/gates/mutator --use-existing-coverage --max-workers $(MUTATE_WORKERS) --test-command "uv run pytest -q -x" $(SCOPE)
 	@uv run python tools/gates/summary.py     # одна строка GATES: … для контракта
 ```
 
 Пустой `SCOPE` при `CHANGED=1` (таск не тронул Python) — гейты зелёные, строка `GATES: нет изменённого кода`.
 
-## Нагрузка на машину — `LS_GATES_JOBS`
+## Нагрузка на машину — `MUTATE_WORKERS`
 
 Мутатор запускает тесты на каждый мутант, и несколько исполнителей с гейтами одновременно кладут машину (на ноутбуке без вентилятора средняя нагрузка доходила до ~100 при двух десятках процессов pytest). Поэтому:
 
 - **Мутатор — только по изменённым файлам** (`CHANGED=1`, охват — `SCOPE`); полный прогон — только ночью и в одиночку (ниже).
-- **Число воркеров мутатора — `LS_GATES_JOBS`** (по умолчанию 2): `--max-workers $(LS_GATES_JOBS)`.
+- **Число воркеров мутатора — `MUTATE_WORKERS`** (по умолчанию 1): `--max-workers $(MUTATE_WORKERS)`.
 - **Перед гейтами — ожидание**: пока на машине больше 8 процессов pytest или идёт чужой мутатор, гейты не стартуют. Отдельными строками рецепта, чтобы шаблон не находил собственную оболочку:
 
 ```make
-LS_GATES_JOBS ?= 2
+MUTATE_WORKERS ?= 1
 
 gates-wait:
-	@while [ "$$(pgrep -f pytest | wc -l)" -gt 8 ]; do sleep 20; done
+	@while [ "$$(pgrep -f pytest | wc -l | tr -d ' ')" -gt 8 ]; do sleep 20; done
 	@while pgrep -f '[t]ools/gates/mutator' >/dev/null; do sleep 20; done
 ```
 
-На macOS у `pgrep` нет флага `-c` — счёт только через `| wc -l`; с `pgrep -fc …` там получается пустая строка, и цикл выходит сразу, ничего не дождавшись.
+На macOS у `pgrep` нет флага `-c` — счёт только через `| wc -l | tr -d ' '`; с `pgrep -fc …` там получается пустая строка, и цикл выходит сразу, ничего не дождавшись.
 
 ## Ночью
 
-Полный прогон мутаций (`make gates` без `CHANGED`) медленный — он идёт ночной задачей (`phases/5-night.md`), когда очередь пуста и никто больше не гоняет гейты, с тем же `LS_GATES_JOBS` и ожиданием; выжившие уходят в `concerns`, не в ремонт.
+Полный прогон мутаций (`make gates` без `CHANGED`) медленный — он идёт ночной задачей (`phases/5-night.md`), когда очередь пуста и никто больше не гоняет гейты, с тем же `MUTATE_WORKERS` и ожиданием; выжившие уходят в `concerns`, не в ремонт.
