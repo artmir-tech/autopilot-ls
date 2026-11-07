@@ -963,6 +963,21 @@ class Run(unittest.TestCase):
         self.ap("queue")
         self.assertIn({"id": "04", "why": "ждёт 03"}, self.state()["queue"]["skipped"])
 
+    def test_pacing_without_a_5_hour_window_paces_by_the_week(self):
+        """get_usage на части тарифов отдаёт только недельные окна — темп тогда по неделе."""
+        self.night_plan()
+        code, out = self.ap("pacing", "--weekly", "48", "--source", "get_usage")
+        self.assertIn("окна 5 ч нет — темп по неделе: неделя 48 % · в полёте не больше 3", out)
+        self.assertIsNone(self.state()["pacing"].get("window_used_pct"))
+        self.assertIn("в полёте не больше 2", self.ap("pacing", "--weekly", "81")[1])
+        code, out = self.ap("pacing", "--weekly", "95", "--weekly-reset", "2026-11-08T13:00:00+00:00")
+        self.assertIn("стоп: неделя 95 %", out)
+        self.assertIn("продолжить в 2026-11-08T13:05:00+00:00", out)
+        self.ap("ticket", "01", "start")
+        code, out = self.ap("ticket", "01", "start")
+        self.assertNotEqual(code, 0)
+        self.assertIn("неделя 95 % — новых запусков нет", out)
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

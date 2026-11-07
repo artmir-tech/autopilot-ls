@@ -56,7 +56,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `state.js` → `pacing` | What | Written by |
 |---|---|---|
 | `window_used_pct` · `window_reset_at` | the 5-hour window: percent used, when it resets | `pacing --window --reset` |
-| `weekly_used_pct` | the weekly limit, percent used | `pacing --weekly` |
+| `weekly_used_pct` · `weekly_reset_at` | the weekly limit, percent used, when it resets — the pacing basis when `get_usage` reports no 5-hour window | `pacing --weekly --weekly-reset` |
 | `reserve_pct` | kept back for reviews and repairs of what flies — 15 unless the owner says otherwise | `pacing --reserve` |
 | `night_weekly_max_pct` | the most of the weekly limit one night may spend — the owner's number, 15 unset | `pacing --night-weekly-max-pct` |
 | `est_cost_by_ticket` | `{id: percent of the window}` — measured or corrected estimates; a ticket without one is estimated by its rung | `pacing --est 03=8` |

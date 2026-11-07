@@ -514,6 +514,16 @@ EST_BY_RUNG = {("haiku", "low"): 2, ("sonnet", "medium"): 5, ("opus", "high"): 1
 PACING_KEYS = {"window": "window_used_pct", "weekly": "weekly_used_pct", "reserve": "reserve_pct",
                "night-weekly-max-pct": "night_weekly_max_pct"}
 WINDOW_TWO, WINDOW_STOP, SHARE = 60, 85, 0.8
+WEEK_TWO, WEEK_STOP = 80, 95        # окна 5 ч нет (часть тарифов) — темп по неделе
+
+
+def pace_basis(p):
+    """(занято %, порог «двое», порог «стоп», название, ключ сброса): окно 5 ч, а без него — неделя."""
+    if p.get("window_used_pct") is not None:
+        return p["window_used_pct"], WINDOW_TWO, WINDOW_STOP, "окно", "window_reset_at"
+    if p.get("weekly_used_pct") is not None:
+        return p["weekly_used_pct"], WEEK_TWO, WEEK_STOP, "неделя", "weekly_reset_at"
+    return None, WINDOW_TWO, WINDOW_STOP, "окно", "window_reset_at"
 
 
 def num(v):
@@ -533,25 +543,28 @@ def ticket_est(p, tk):
 
 
 def pacing_room(p):
-    return round(SHARE * (100 - (p.get("window_used_pct") or 0) - p.get("reserve_pct", 15)))
+    used = pace_basis(p)[0] or 0
+    return round(SHARE * (100 - used - p.get("reserve_pct", 15)))
 
 
-def resume_at(p):
+def resume_at(p, key="window_reset_at"):
     try:
-        t = dt.datetime.fromisoformat(p.get("window_reset_at") or "")
+        t = dt.datetime.fromisoformat(p.get(key) or "")
     except ValueError:
         return None
     return (t + dt.timedelta(minutes=5)).isoformat(timespec="seconds")
 
 
 def pacing_verdict(state, p):
-    used = p.get("window_used_pct") or 0
-    if used >= WINDOW_STOP:
-        out = ["стоп: окно %s %% — новых запусков нет; летящие довести до посадки, синк, продолжить в %s"
-               % (used, resume_at(p) or "сброс окна + 5 мин")]
+    used, two, stop, name, reset_key = pace_basis(p)
+    used = used or 0
+    head = "" if name == "окно" else "окна 5 ч нет — темп по неделе: "
+    if used >= stop:
+        out = ["%sстоп: %s %s %% — новых запусков нет; летящие довести до посадки, синк, продолжить в %s"
+               % (head, name, used, resume_at(p, reset_key) or "сброс + 5 мин")]
     else:
-        out = ["окно %s %% · в полёте не больше %d · место под таск %d %%"
-               % (used, 2 if used > WINDOW_TWO else 3, pacing_room(p))]
+        out = ["%s%s %s %% · в полёте не больше %d · место под таск %d %%"
+               % (head, name, used, 2 if used > two else 3, pacing_room(p))]
     n = state.get("night") or {}
     if n.get("status") != "running":
         return out
@@ -560,8 +573,10 @@ def pacing_verdict(state, p):
     if n.get("weekly_at_start") is not None and spent >= cap:
         n.update(status="stopped", stop="неделя +%s %% из %s %%" % (spent, cap))
         out.append("стоп ночи: неделя +%s %% из %s %%" % (spent, cap))
-    elif used >= WINDOW_STOP:
+    elif used >= stop and name == "окно":
         n.update(status="paused", resume_at=resume_at(p))
+    elif used >= stop:
+        n.update(status="stopped", stop="неделя %s %%" % used)
     return out
 
 
@@ -573,7 +588,7 @@ def cmd_pacing(state, pos, opt, multi):
     for flag, key in PACING_KEYS.items():
         if opt.get(flag) not in (None, True):
             p[key] = num(opt[flag])
-    for flag, key in (("reset", "window_reset_at"), ("source", "source")):
+    for flag, key in (("reset", "window_reset_at"), ("weekly-reset", "weekly_reset_at"), ("source", "source")):
         if isinstance(opt.get(flag), str):
             p[key] = opt[flag]
     for pair in multi.get("est", []):
@@ -752,17 +767,17 @@ def ls_pacing_guard(state, act, ids):
     """Окно ≥85 % — запусков нет; иначе в полёте не больше, чем окно позволяет (3 или 2).
     Цифры устарели — сначала get_usage и `pacing`, а не обход отказа."""
     p = state.get("pacing") or {}
-    used = p.get("window_used_pct")
+    used, two, stop, name, _ = pace_basis(p)
     if used is None or act not in ("start", "retry"):
         return
-    if used >= WINDOW_STOP:
-        die("окно %s %% — новых запусков нет: летящие довести, продолжить после сброса. "
-            "Окно уже сброшено — свежие цифры: get_usage → `pacing --window …`" % used)
-    cap = 2 if used > WINDOW_TWO else 3
+    if used >= stop:
+        die("%s %s %% — новых запусков нет: летящие довести, продолжить после сброса. "
+            "Уже сброшено — свежие цифры: get_usage → `pacing`" % (name, used))
+    cap = 2 if used > two else 3
     flying = {t["id"] for t in state.get("tickets") or [] if t.get("status") in IN_FLIGHT}
     total = len(flying | set(ids))
     if act == "start" and total > cap:
-        die("в полёте было бы %d, окно %s %% позволяет %d — запусти меньше" % (total, used, cap))
+        die("в полёте было бы %d, %s %s %% позволяет %d — запусти меньше" % (total, name, used, cap))
 
 
 def ls_night_record(state, act, ids):
