@@ -990,6 +990,18 @@ class Run(unittest.TestCase):
         self.ap("queue")
         self.assertIn({"id": "02", "why": "ждёт 01"}, self.state()["queue"]["skipped"])
 
+    def test_the_night_counts_only_its_own_queue(self):
+        """Ревью дневного таска, закрытое ночью, — не ночная работа."""
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("ticket", "01", "review")
+        self.ap("night", "start")
+        self.ap("ticket", "02", "start")
+        self.ap("ticket", "02", "done", "--tests", "4/0", "--commit", "2222222bbbb")
+        self.ap("ticket", "01", "done")
+        self.assertEqual(self.state()["night"]["done"], ["02"])
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

@@ -789,6 +789,10 @@ def ls_night_record(state, act, ids):
     n = state.get("night") or {}
     if n.get("status") != "running" or act not in ("done", "fail"):
         return
+    queued = set((state.get("queue") or {}).get("tickets") or [])
+    ids = [i for i in ids if i in queued]          # ревью дневного таска, закрытое ночью, — не ночная работа
+    if not ids:
+        return
     n["done" if act == "done" else "failed"].extend(i for i in ids if i not in n["done"] + n["failed"])
     if act == "fail":
         n.update(status="stopped", stop="упал таск %s" % ", ".join(ids))
