@@ -1,6 +1,6 @@
 # autopilot-ls — fork of Autopilot for «Легко Сказать»
 
-**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), tuned for rebuilding «Легко Сказать», a Russian-language Telegram coaching bot (aiogram, SQLite, versioned XML prompts). It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (73: 47 upstream + 26 new). Licence: MIT, as upstream.
+**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), tuned for rebuilding «Легко Сказать», a Russian-language Telegram coaching bot (aiogram, SQLite, versioned XML prompts). It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (73: 47 upstream + 26 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
 
 ---
 
@@ -8,7 +8,10 @@
 
 ## Как поставить и проверить
 
+Репозиторий форка: https://github.com/artmir-tech/autopilot-ls, ветка `ls` (`main` — нетронутый upstream).
+
 ```bash
+git clone -b ls https://github.com/artmir-tech/autopilot-ls && cd autopilot-ls
 tools/install-ls.sh                          # копия skills/autopilot → ~/.claude/skills/autopilot-ls/
 python3 -m unittest discover -s tests        # 73 теста
 python3 tools/lint-ls.py                     # каждая ссылка на файл навыка существует
