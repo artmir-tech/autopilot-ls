@@ -64,6 +64,7 @@ The fork adds no stage — the e2e replay is part of «Приёмка», the nig
 | `Тип: prompt` | промпт-таск |
 | L2 replay with a judge | Прогон диалогов |
 | `Внимание: owner` · `review` | нужно от тебя · посмотри |
+| `awaiting_owner` · `prompt-reviews/NN-*.html` | ждёт тебя · обзор промпта |
 | method (`[МЕТОДИКА — подтверди]`) | методика |
 | `dispatch: sessions` | сессии-исполнители |
 | `program` · its row | Программа · прогон программы |

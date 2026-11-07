@@ -81,7 +81,8 @@ ORDER = ["preflight", "manifest", "briefing", "spec", "plan", "build", "review",
 # Этап, чей результат лежит на диске, пройден — даже если его забыли отметить.
 ARTIFACT = {"manifest": "manifest.md", "spec": "spec.md", "plan": "tickets/*.md"}
 TICKET_STATUSES = {"start": "in-progress", "review": "review", "repair": "repair",
-                   "done": "done", "fail": "failed", "retry": "in-progress", "reset": "pending"}
+                   "done": "done", "fail": "failed", "retry": "in-progress", "reset": "pending",
+                   "await": "awaiting_owner"}      # форк: промпт ждёт владельца (phases/5-prompts.md)
 LISTS = {"concerns", "additions", "report", "debt.placeholders", "debt.assumptions", "debt.emptyEnv"}
 
 
@@ -715,6 +716,33 @@ def cmd_program(pos, opt):
         "программа сдана" if rows and all(r["status"] == "landed" for r in rows) else "следующего нет")
     flying = [r["id"] for r in rows if r["status"] == "in-flight"]
     return [head] + (["в работе: " + ", ".join(flying)] if flying else []) + out
+
+
+# ── форк autopilot-ls: обзор владельцем (phases/5-prompts.md, «The owner's look») ──
+
+def ls_owner_guard(state, act, ids, opt):
+    """await — только закоммиченный таск; из awaiting_owner в done — только словами владельца."""
+    known = {t["id"]: t for t in state.get("tickets") or []}
+    for i in ids:
+        tk = known.get(i) or {}
+        if act == "await" and not isinstance(opt.get("commit"), str) and not tk.get("commit"):
+            die("таск %s: нет --commit — владельцу показывают только влитый таск" % i)
+        if act == "await" and not isinstance(opt.get("page"), str):
+            die("таск %s: await --page prompt-reviews/NN-<slug>.html — без страницы обзора владельцу нечего смотреть" % i)
+        if act == "done" and tk.get("status") == "awaiting_owner" and not isinstance(opt.get("by-user"), str):
+            die("таск %s ждёт владельца — done только его словами: ticket %s done --by-user \"«…»\"; "
+                "его правки — ticket %s repair --note \"…\"" % (i, i, i))
+
+
+def record_owner(state, tk, act, opt):
+    if act == "await":
+        tk["page"] = opt["page"]
+        record_landing(tk, opt)
+        n = state.get("night") or {}
+        if n.get("status") == "running" and tk["id"] not in n.setdefault("awaiting", []):
+            n["awaiting"].append(tk["id"])
+    elif act == "done" and tk.get("status") == "awaiting_owner":
+        tk.setdefault("approvedByUser", []).append(opt["by-user"])
 
 
 IN_FLIGHT = ("in-progress", "repair")
@@ -1368,13 +1396,14 @@ def cmd_ticket(state, pos, opt):
     acts = [p for p in pos if p in TICKET_STATUSES]
     ids = [p for p in pos if p not in TICKET_STATUSES]
     if len(acts) != 1 or not ids:
-        die("ticket <id…> start|review|repair|done|fail|retry|reset")
+        die("ticket <id…> start|review|repair|done|fail|retry|reset|await")
     act = acts[0]
     known = {t["id"]: t for t in state.get("tickets") or []}
     by_user = opt.get("by-user") if isinstance(opt.get("by-user"), str) else None
     t = now()
     ls_night_guard(state, act, ids)
     ls_pacing_guard(state, act, ids)
+    ls_owner_guard(state, act, ids, opt)
     for i in ids:                                    # сначала все отказы — потом запись
         tk = known.get(i)
         if tk is None:
@@ -1385,6 +1414,7 @@ def cmd_ticket(state, pos, opt):
         tk = known[i]
         notes.append(record_attempt(state, tk, act, opt))
         record_session(state, tk, act, opt)
+        record_owner(state, tk, act, opt)
         tk["status"] = TICKET_STATUSES[act]
         if act == "start":
             tk.setdefault("startedAt", t)
@@ -1410,6 +1440,8 @@ def cmd_ticket(state, pos, opt):
         if act == "done":
             close_requirements(state, tk, opt, t)
             record_landing(tk, opt)
+        elif act == "review":
+            record_landing(tk, opt)            # форк: prompt-таск влит, ревью — до await
         if opt.get("tests"):
             tk["tests"] = tests_pair(opt["tests"])
             state["tests"] = tk["tests"]

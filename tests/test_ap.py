@@ -920,6 +920,49 @@ class Run(unittest.TestCase):
         code, out = self.ap("ticket", "04", "start")
         self.assertIn("окно 90 % — новых запусков нет", out)
 
+    # ── форк autopilot-ls: обзор промпта владельцем ────────────────────────
+    def prompt_plan(self):
+        self.plan()
+        self.write("tickets/03-coach.md", ticket("03", "Промпт коуча", "R02", "01", ["prompts/coach/", "evals/coach/"],
+                                                 2, "да — промпт", "opus", kind="prompt", effort="high",
+                                                 attention="review", night="да"))
+        self.write("tickets/04-next.md", ticket("04", "После коуча", "R05", "03", ["src/next/"], 3, night="да"))
+        self.ap("tickets")
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+
+    def test_a_prompt_ticket_waits_for_the_owner_and_lands_only_on_their_words(self):
+        self.prompt_plan()
+        self.ap("ticket", "03", "start")
+        code, out = self.ap("ticket", "03", "await", "--page", "prompt-reviews/03-coach.html")
+        self.assertNotEqual(code, 0)
+        self.assertIn("нет --commit", out)
+        code, out = self.ap("ticket", "03", "await", "--page", "prompt-reviews/03-coach.html",
+                            "--commit", "3333333cccc", "--gates", "eval 18/20")
+        self.assertEqual(code, 0, out)
+        t = {x["id"]: x for x in self.state()["tickets"]}["03"]
+        self.assertEqual((t["status"], t["page"], t["commit"]), ("awaiting_owner", "prompt-reviews/03-coach.html",
+                                                                "3333333cccc"))
+        self.assertRegex(self.manifest(), r"\| R02 \|[^\n]*\| in-ticket \|")
+        code, out = self.ap("ticket", "03", "done")
+        self.assertNotEqual(code, 0)
+        self.assertIn("ждёт владельца", out)
+        self.assertEqual(self.ap("ticket", "03", "repair", "--note", "владелец: вопросов не больше пяти")[0], 0)
+        self.ap("ticket", "03", "await", "--page", "prompt-reviews/03-coach.html", "--commit", "4444444dddd")
+        code, out = self.ap("ticket", "03", "done", "--by-user", "«ок, утверждаю»")
+        self.assertEqual(code, 0, out)
+        t = {x["id"]: x for x in self.state()["tickets"]}["03"]
+        self.assertEqual((t["status"], t["approvedByUser"], t["repairs"]), ("done", ["«ок, утверждаю»"], 1))
+
+    def test_the_night_lists_awaiting_tickets_and_their_dependents_wait(self):
+        self.prompt_plan()
+        self.ap("night", "start")
+        self.ap("ticket", "03", "start")
+        self.ap("ticket", "03", "await", "--page", "prompt-reviews/03-coach.html", "--commit", "3333333cccc")
+        self.assertEqual(self.state()["night"]["awaiting"], ["03"])
+        self.ap("queue")
+        self.assertIn({"id": "04", "why": "ждёт 03"}, self.state()["queue"]["skipped"])
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

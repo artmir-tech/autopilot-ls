@@ -14,6 +14,8 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `tickets[].attempts` | — | `[{model, effort, at}]` — the rung each launch actually flew on | `ticket NN start`, `ticket NN retry` |
 | `tickets[].base` | — | where the main branch stood before the ticket landed | `ticket NN done --base` |
 | `tickets[].gates` | — | the gates' summary as step 6 printed it | `ticket NN done --gates` |
+| `tickets[].status` = `awaiting_owner` | — | landed, reviewed, waiting for the owner's word on its review page | `ticket NN await --page …` |
+| `tickets[].page` · `approvedByUser` | — | the review page's path; the owner's words that approved it | `ticket NN await`, `ticket NN done --by-user` |
 
 `check-plan` refuses a ticket without one of the five header fields, with a value outside the lists, with `Ночью: да` beside `Внимание: owner`, a `migration` sharing its wave, a non-prompt ticket writing into `prompts/`, and a prompt ticket writing outside `prompts/` and `evals/` — each as a `!` line of gate G3.
 
@@ -23,6 +25,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 |---|---|
 | a retry, before the fresh executor goes out | `ticket 03 retry` — prints `ретрай N: <model> · <effort>`, the rung from the ladder in `phases/5-repair.md`; launch on exactly that. `--model`/`--effort` override it only on the user's word |
 | a ticket lands | `ticket 03 done --tests 34/0 --gates "crap 7.4 · dry 0 · mutants 38/41" --base <sha> --commit <sha>` |
+| a prompt ticket reviewed clean, its page written | `ticket 03 await --page prompt-reviews/03-coach.html --gates "<EVAL>"` — `done` is then refused without `--by-user "«их слова»"`; their comments are `ticket 03 repair --note "…"` |
 | Phase 0, and whenever a `!` about the fork appears | `ls-check` — `docs/standards/ub-mode.md` in the project, `.claude/worktrees/` in `.gitignore`, whether `make gates` exists yet. Not an event: it writes nothing to the log |
 
 ## The night queue — `queue` and `night`
@@ -33,7 +36,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `queue.skipped` | `[{id, why}]` — every other unfinished ticket and why it is not tonight: «Ночью: нет», «ждёт 03», «упал», the owner's note | `queue` |
 | `queue.dropped` | `{id: why}` — taken out by hand for the night, kept across rebuilds | `queue drop` |
 | `night.status` | `running` → `stopped` (first `failed`, or the pacing stop) → `finished` | `night start · stop · end`, `ticket … fail` |
-| `night.done` · `night.failed` | what landed and what failed tonight | `ticket … done · fail` while the night runs |
+| `night.done` · `night.failed` · `night.awaiting` | what landed, what failed, which prompt tickets wait for the owner's look | `ticket … done · fail · await` while the night runs |
 | `night.stop` · `night.report` | why it stopped; the morning report's file name | `night stop`, `ticket … fail`, `night end` |
 | `night.resume_at` | while `paused`: when the window resets + 5 minutes | `pacing`, at 85 % |
 | `night.date` · `startedAt` · `endedAt` | the night's bounds | `night start`, `night end` |
@@ -95,7 +98,7 @@ While `dispatch` is `sessions`, every `ap.py` call also rewrites `.autopilot/<di
 |---|---|
 | Сделано | `night.done` → each ticket's title, `tests`, `gates` — what became possible, in the user's words |
 | Упало | `night.failed` → the ticket's `concerns`; `night.stop`; the dependents left untouched (`queue.skipped` «ждёт …») |
-| Нужно от тебя | `queue.dropped` and `queue.skipped` with the owner's reasons; tickets with `attention: owner` still pending; `attention: review` landed tonight («посмотри»); a `waiting` left open |
+| Нужно от тебя | `night.awaiting` → each ticket's `page`, first («открой страницу обзора и ответь»); `queue.dropped` and `queue.skipped` with the owner's reasons; tickets with `attention: owner` still pending; `attention: review` landed tonight («посмотри»); a `waiting` left open |
 | Цифры | `pacing.window_used_pct` at start and end, `pacing.weekly_used_pct − night.weekly_at_start` against `night_weekly_max_pct`, counts of done / failed / waiting; `e2e` if L2 ran |
 
 Words from the table in `SKILL.md`: «Окно», «Проверки качества», «Прогон диалогов» — never `pacing`, gates or L2.

@@ -32,6 +32,19 @@ These replace seam tests and `make gates` for this ticket; the check command for
 
 - **The executor reads `prompts/prompt-executor.md`** instead of `prompts/executor.md`, on `opus · high`. Its contract carries `EVAL:` where a code ticket carries `GATES:`.
 - **Every prompt ticket gets a point review** — `Ревью: да — промпт`, one fresh subagent on `opus` with `prompts/prompt-review.md`: the axis «Prompt craft» replaces Craft; Manifest and Spec stay. A prompt costs one review; a broken one costs every author who meets it.
+- **Then the owner — never before the reviewer, never instead of it** (below).
 - **Method is the owner's** (`phases/2-briefing.md`). A prompt ticket whose method is still open is `Внимание: owner` and waits; one whose method is assumed carries `[МЕТОДИКА — подтверди]` in the prompt and `Внимание: review`. Neither is ever filled in from what coaching usually looks like.
 - **Night** — a prompt ticket flies at night only with the method settled and `EVAL_MAX_USD` set (`phases/5-night.md`).
+## The owner's look — LLM review first, then a page, then their word
+
+The owner approves prompts and method, but **is never sent raw XML**. The order is fixed:
+
+1. **The ticket lands** through steps 2–8 of `phases/5-subagents.md`, except that step 8 records `ap.py ticket NN review --base <sha> --commit <sha>` instead of `done`.
+2. **The prompt reviewer** checks the manifest's requirements, the prompt's text and its technique. `BLOCKING` → `phases/5-repair.md`, as for any ticket. Nothing blocking → it has written **the review page** `.autopilot/<dir>/prompt-reviews/NN-<slug>.html` — what changed, in which XML sections, why (the `R##` with their quotes), how it was checked (cases, A/B, budget), open questions with recommendations, and fields for the owner's comments; its format is in `prompts/prompt-review.md`.
+3. **`ap.py ticket NN await --page prompt-reviews/NN-<slug>.html --gates "<EVAL>"`** — the ticket is `awaiting_owner`: landed, but its rows stay `in-ticket`. One line to the owner, the path in it: «Промпт коуча v1.3 ждёт тебя — открой `.autopilot/…/prompt-reviews/03-coach.html`, ответь в чате». The run goes on with other tickets; no `ask`, the run is not waiting as a whole.
+4. **«ок» from the owner** → `ap.py ticket NN done --by-user "«их слова»"` — only their words close it; `ap.py` refuses `done` without them.
+5. **Comments** → `ap.py ticket NN repair --note "…"`, and the comments go to the same executor **verbatim** as a дозапрос (a fresh context with the ticket and the comments if it cannot be continued). A comment that changes method or adds something is also the owner's words into the brief's `## Дополнения`, and a `G##` row if it adds. The repair lands, the reviewer in mode «ремонт» rewrites the page, and `await` again. The repair caps hold: a third round is the owner's own `reset --by-user`.
+
+In full mode and at night the page is written and the ticket waits: the morning report lists every page under «Нужно от тебя», and tickets that depend on an awaiting one do not fly at night. `ap.py finish` refuses a run with a ticket still awaiting the owner — the report asks for them instead.
+
 - **The whole branch** — with two or more prompt tickets in the run, the whole-branch review adds one prompt reviewer, mode «ветка», for what no single ticket shows: two stages that contradict each other, a hand-off field one stage writes and the next does not read.
