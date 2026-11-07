@@ -17,7 +17,7 @@ python3 .autopilot/ap.py night start      # строит очередь и от�
 
 ## After the queue
 
-If the window allows, the slow checks no ticket pays for: the full mutation run (`make gates` without `CHANGED`) — survivors to `ap.py add concerns`; the L2 replay of `phases/8a-e2e.md` when `E2E_MAX_USD` is set — a regression becomes a ticket for the day, never a night repair.
+If the window allows, the slow checks no ticket pays for: the full mutation run (`make gates` without `CHANGED`), once the queue is empty and nothing else runs gates, with `LS_GATES_JOBS` workers — survivors to `ap.py add concerns`; the L2 replay of `phases/8a-e2e.md` when `E2E_MAX_USD` is set — a regression becomes a ticket for the day, never a night repair.
 
 ## The morning report
 
