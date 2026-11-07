@@ -380,8 +380,26 @@ def ls_wave_problems(tickets):
     return out
 
 
+PROMPT_ZONE = ("prompts/", "evals/")
+
+
+def ls_zone_problems(t):
+    """prompts/** — только prompt-таскам; prompt-таск — только prompts/ и evals/ (phases/5-prompts.md)."""
+    out = []
+    for z in t.get("zone") or []:
+        z = z.lstrip("./")
+        inside = z.startswith(PROMPT_ZONE) or z.rstrip("/") + "/" in PROMPT_ZONE
+        if t.get("type") == "prompt" and not inside:
+            out.append("таск %s (prompt) пишет в %s — prompt-таск правит только prompts/ и evals/" % (t["id"], z))
+        elif t.get("type") != "prompt" and z.startswith("prompts/"):
+            out.append("таск %s (%s) пишет в %s — зона промптов только у prompt-тасков"
+                       % (t["id"], t.get("type") or "?", z))
+    return out
+
+
 def ls_plan_problems(tickets):
-    return [p for t in tickets for p in ls_field_problems(t)] + ls_wave_problems(tickets)
+    return ([p for t in tickets for p in ls_field_problems(t) + ls_zone_problems(t)]
+            + ls_wave_problems(tickets))
 
 
 def rung_of(model, effort):

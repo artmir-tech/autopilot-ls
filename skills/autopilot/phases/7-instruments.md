@@ -15,7 +15,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `tickets[].base` | — | where the main branch stood before the ticket landed | `ticket NN done --base` |
 | `tickets[].gates` | — | the gates' summary as step 6 printed it | `ticket NN done --gates` |
 
-`check-plan` refuses a ticket without one of the five header fields, with a value outside the lists, with `Ночью: да` beside `Внимание: owner`, and a `migration` sharing its wave — each as a `!` line of gate G3.
+`check-plan` refuses a ticket without one of the five header fields, with a value outside the lists, with `Ночью: да` beside `Внимание: owner`, a `migration` sharing its wave, a non-prompt ticket writing into `prompts/`, and a prompt ticket writing outside `prompts/` and `evals/` — each as a `!` line of gate G3.
 
 ## The fork's commands
 

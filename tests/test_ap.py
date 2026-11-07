@@ -644,6 +644,18 @@ class Run(unittest.TestCase):
         code, out = self.ap("check-plan")
         self.assertIn("таск 03 (migration) делит волну 2 с 02 — миграция летит одна", out)
 
+    def test_check_plan_keeps_the_prompt_zone_for_prompt_tickets(self):
+        self.plan()
+        self.write("tickets/03-p.md", ticket("03", "Промпт", "R02", "01", ["prompts/coach/", "evals/coach/"], 2,
+                                             model="opus", kind="prompt", effort="high"))
+        self.write("tickets/04-c.md", ticket("04", "Код", "R02", "01", ["src/coach/", "prompts/shared/"], 2))
+        self.write("tickets/05-p.md", ticket("05", "Промпт и код", "R02", "01", ["prompts/w/", "src/w/"], 2,
+                                             model="opus", kind="prompt", effort="high"))
+        code, out = self.ap("check-plan")
+        self.assertIn("таск 04 (code) пишет в prompts/shared/ — зона промптов только у prompt-тасков", out)
+        self.assertIn("таск 05 (prompt) пишет в src/w/ — prompt-таск правит только prompts/ и evals/", out)
+        self.assertNotIn("таск 03 (", out)
+
     def test_attempts_record_the_rung_and_retries_climb_the_ladder(self):
         self.plan()
         self.write("tickets/02-priem.md", ticket("02", "Приём", "R01.1, R02, A01", "01", ["src/bot/"], 2,
