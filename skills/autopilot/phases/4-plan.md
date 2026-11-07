@@ -91,6 +91,18 @@ Every ticket of the chain carries the same requirement. It applies when the chan
 
 Calibrate, do not trust: after two or three runs, `repairs` by model in `state.js` says whether `sonnet` tickets come back more often than `opus` ones — a model that needs a repair every other ticket costs more than the one it saved.
 
+### Night — computed from five conditions
+
+`Ночью: да` only when **all five** hold; one doubt is `нет`. A night ticket is one nobody will be asked about before morning (`phases/5-night.md`):
+
+1. **No open question to the owner** — none of its manifest rows is `open`, and `Внимание` is not `owner`. Method that is assumed, not settled, is `owner` (`phases/2-briefing.md`).
+2. **No outward action** — nothing it does reaches past the machine: no deploy, no message to a real person, no webhook registration, no migration of the production database. Those are questions by rule 4, and at night there is nobody to ask.
+3. **Deterministic tests** — its check runs on cassettes and stubs; a check that calls a live model or service is `нет`.
+4. **Live calls only behind a cap** — a `prompt` or `e2e` ticket that needs a live run flies at night only with `EVAL_MAX_USD` / `E2E_MAX_USD` set; an empty cap is `нет`.
+5. **An isolated zone** — no ticket of the day's work is expected to touch it, and its parents are landed or ahead of it in the night queue.
+
+`check-plan` refuses `да` beside `Внимание: owner` and beside an `open` row; the other three are your judgement, and a ticket you are unsure of stays a day ticket.
+
 ## The ticket file
 
 `.autopilot/<dir>/tickets/NN-<slug>.md`. The header lines are read by `ap.py` — keep their names:

@@ -707,6 +707,68 @@ class Run(unittest.TestCase):
         self.assertNotIn("! ", out)
         self.assertIn("make gates есть", out)
 
+    # ── форк autopilot-ls: ночная очередь ──────────────────────────────────
+    def night_plan(self):
+        self.init()
+        self.write("manifest.md", MANIFEST)
+        self.write("tickets/01-karkas.md", ticket("01", "Каркас", "R01", "—", ["src/core/"], 1, model="opus",
+                                                  effort="high", night="нет"))
+        self.write("tickets/02-a.md", ticket("02", "А", "R02", "01", ["src/a/"], 2, night="да"))
+        self.write("tickets/03-b.md", ticket("03", "Б", "R05", "01", ["src/b/"], 2, night="да"))
+        self.write("tickets/04-c.md", ticket("04", "В", "R02", "02", ["src/c/"], 3, night="да"))
+        self.write("tickets/05-d.md", ticket("05", "Г", "R05", "03", ["src/d/"], 3, night="нет"))
+        self.ap("tickets")
+
+    def test_check_plan_refuses_night_for_a_ticket_with_an_open_row(self):
+        self.night_plan()
+        self.write("manifest.md", MANIFEST.replace("| R02 | «складывает в таблицу» | in-spec |",
+                                                   "| R02 | «складывает в таблицу» | open |"))
+        code, out = self.ap("check-plan")
+        self.assertIn("таск 02: «Ночью: да», а R02 ещё open — вопрос владельцу не закрыт", out)
+
+    def test_queue_takes_night_tickets_whose_parents_are_done_or_queued(self):
+        self.night_plan()
+        code, out = self.ap("queue")
+        self.assertIn("в очереди 0", out)                               # 01 не сдан, не ночной
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        code, out = self.ap("queue")
+        q = self.state()["queue"]
+        self.assertEqual(q["tickets"], ["02", "03", "04"])
+        self.assertIn({"id": "05", "why": "Ночью: нет"}, q["skipped"])
+
+    def test_night_flies_only_the_queue_and_stops_after_the_first_failure(self):
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("queue")
+        self.assertEqual(self.ap("night", "start")[0], 0)
+        code, out = self.ap("ticket", "05", "start")
+        self.assertNotEqual(code, 0)
+        self.assertIn("ночью летит только очередь", out)
+        self.ap("ticket", "02", "03", "start")
+        self.ap("ticket", "02", "done", "--tests", "4/0", "--commit", "2222222bbbb")
+        self.ap("ticket", "03", "fail", "--note", "порт занят")
+        code, out = self.ap("ticket", "04", "start")
+        self.assertNotEqual(code, 0)
+        self.assertIn("ночь остановлена", out)
+        n = self.state()["night"]
+        self.assertEqual((n["status"], n["done"], n["failed"]), ("stopped", ["02"], ["03"]))
+        self.ap("night", "end", "--report", "night-2026-11-08.md")
+        self.assertEqual(self.state()["night"]["status"], "finished")
+        self.assertEqual(self.ap("ticket", "05", "start")[0], 0)           # днём — как обычно
+
+    def test_queue_drop_takes_a_ticket_and_its_dependents_out(self):
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("queue")
+        self.ap("queue", "drop", "02", "--note", "нужна методика")
+        q = self.state()["queue"]
+        self.assertEqual(q["tickets"], ["03"])
+        self.assertIn({"id": "02", "why": "нужна методика"}, q["skipped"])
+        self.assertIn({"id": "04", "why": "ждёт 02"}, q["skipped"])
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""

@@ -25,6 +25,27 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | a ticket lands | `ticket 03 done --tests 34/0 --gates "crap 7.4 · dry 0 · mutants 38/41" --base <sha> --commit <sha>` |
 | Phase 0, and whenever a `!` about the fork appears | `ls-check` — `docs/standards/ub-mode.md` in the project, `.claude/worktrees/` in `.gitignore`, whether `make gates` exists yet. Not an event: it writes nothing to the log |
 
+## The night queue — `queue` and `night`
+
+| `state.js` | What | Written by |
+|---|---|---|
+| `queue.tickets` | ids in launch order: `night_ok`, pending, parents landed or ahead in the queue | `queue`, `night start` |
+| `queue.skipped` | `[{id, why}]` — every other unfinished ticket and why it is not tonight: «Ночью: нет», «ждёт 03», «упал», the owner's note | `queue` |
+| `queue.dropped` | `{id: why}` — taken out by hand for the night, kept across rebuilds | `queue drop` |
+| `night.status` | `running` → `stopped` (first `failed`, or the pacing stop) → `finished` | `night start · stop · end`, `ticket … fail` |
+| `night.done` · `night.failed` | what landed and what failed tonight | `ticket … done · fail` while the night runs |
+| `night.stop` · `night.report` | why it stopped; the morning report's file name | `night stop`, `ticket … fail`, `night end` |
+
+| Event | Call |
+|---|---|
+| show what would fly tonight | `queue` |
+| a ticket needs the owner at night | `queue drop 07 --note "что нужно от владельца"` — its dependents leave with it |
+| the night begins | `night start` — rebuilds the queue; until `night end`, `ticket … start · retry` refuse anything outside it, and refuse everything once a ticket failed |
+| the pacing stop at night | `night stop --note "окно 85 %"` |
+| the morning report is written | `night end --report night-2026-11-08.md` |
+
+**«Ночная очередь» on a dashboard** would show `queue.tickets` in order, `queue.skipped` with reasons, and `night` as «идёт · остановлена: <почему> · закончена» with done and failed — the morning report is the same data in words.
+
 ## Calibration
 
 After a run, `attempts` and `repairs` by `model` answer the one question the heuristic in `phases/4-plan.md` cannot: which kind of ticket the cheaper model really carries. The final report of the run does not show them; the next plan reads them from the archived `state.js`.

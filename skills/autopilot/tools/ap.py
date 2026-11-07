@@ -397,9 +397,106 @@ def ls_zone_problems(t):
     return out
 
 
-def ls_plan_problems(tickets):
+def ls_night_row_problems(state, tickets):
+    """«Ночью: да» при открытом требовании — ночью некому ответить (phases/4-plan.md, «Night»)."""
+    rows = dict(manifest_rows(state) or [])
+    return ["таск %s: «Ночью: да», а %s ещё open — вопрос владельцу не закрыт" % (t["id"], r)
+            for t in tickets if t.get("night_ok")
+            for r in sorted({x.split(".")[0] for x in t.get("requirements", [])}) if rows.get(r) == "open"]
+
+
+def ls_plan_problems(state, tickets):
     return ([p for t in tickets for p in ls_field_problems(t) + ls_zone_problems(t)]
-            + ls_wave_problems(tickets))
+            + ls_wave_problems(tickets) + ls_night_row_problems(state, tickets))
+
+
+# ── форк autopilot-ls: ночная очередь (phases/5-night.md) ──────────────────
+
+def queue_skip_reason(t, by, queued, dropped):
+    if t["id"] in dropped:
+        return dropped[t["id"]]
+    if t.get("status") == "failed":
+        return "упал"
+    if not t.get("night_ok"):
+        return "Ночью: нет"
+    if t.get("status") not in (None, "pending"):
+        return "в работе"
+    for b in t.get("blockedBy") or []:
+        if (by.get(b) or {}).get("status") != "done" and b not in queued:
+            return "ждёт %s" % b
+    return None
+
+
+def build_queue(state):
+    """Очередь ночи: ночные таски, чьи родители сданы или стоят в очереди раньше, по волнам."""
+    q = state.get("queue") or {}
+    dropped = q.get("dropped") or {}
+    tickets = [t for t in state.get("tickets") or [] if t.get("status") != "done"]
+    by = {t["id"]: t for t in state.get("tickets") or []}
+    queued, skipped = [], []
+    for t in sorted(tickets, key=lambda x: (x.get("wave") or 99, x["id"])):
+        why = queue_skip_reason(t, by, queued, dropped)
+        if why:
+            skipped.append({"id": t["id"], "why": why})
+        else:
+            queued.append(t["id"])
+    state["queue"] = {"tickets": queued, "skipped": skipped, "dropped": dropped, "builtAt": state["updatedAt"]}
+    return ["в очереди %d%s" % (len(queued), (": " + ", ".join(queued)) if queued else "")] + \
+           ["мимо: %s — %s" % (s["id"], s["why"]) for s in skipped]
+
+
+def cmd_queue(state, pos, opt):
+    if pos[:1] == ["drop"]:
+        if not pos[1:] or not isinstance(opt.get("note"), str):
+            die("queue drop <id…> --note \"почему не ночью\"")
+        q = state.setdefault("queue", {})
+        q.setdefault("dropped", {}).update({i: opt["note"] for i in pos[1:]})
+    elif pos:
+        die("queue | queue drop <id…> --note \"…\"")
+    notes = build_queue(state)
+    log(state, "queue", n=len(state["queue"]["tickets"]))
+    return notes
+
+
+def cmd_night(state, pos, opt):
+    act = pos[0] if pos else ""
+    n = state.get("night") or {}
+    if act == "start":
+        notes = build_queue(state)
+        state["night"] = {"date": state["updatedAt"][:10], "status": "running", "startedAt": state["updatedAt"],
+                          "done": [], "failed": [], "stop": None, "report": None}
+        log(state, "night", act="start", n=len(state["queue"]["tickets"]))
+        return notes
+    if act == "stop" and isinstance(opt.get("note"), str) and n:
+        n.update(status="stopped", stop=opt["note"])
+    elif act == "end" and isinstance(opt.get("report"), str) and n:
+        n.update(status="finished", endedAt=state["updatedAt"], report=opt["report"])
+    else:
+        die("night start | night stop --note \"…\" | night end --report night-<дата>.md")
+    log(state, "night", act=act)
+    return []
+
+
+def ls_night_guard(state, act, ids):
+    """Ночью летит только очередь, и после первого упавшего — ничего (phases/5-night.md)."""
+    n = state.get("night") or {}
+    if n.get("status") not in ("running", "stopped") or act not in ("start", "retry"):
+        return
+    if n["status"] == "stopped":
+        die("ночь остановлена (%s) — новых запусков до утра нет: отчёт и `night end`" % (n.get("stop") or "?"))
+    q = set((state.get("queue") or {}).get("tickets") or [])
+    outside = [i for i in ids if i not in q]
+    if outside:
+        die("ночью летит только очередь: %s не в ней — `queue` покажет почему" % ", ".join(outside))
+
+
+def ls_night_record(state, act, ids):
+    n = state.get("night") or {}
+    if n.get("status") != "running" or act not in ("done", "fail"):
+        return
+    n["done" if act == "done" else "failed"].extend(i for i in ids if i not in n["done"] + n["failed"])
+    if act == "fail":
+        n.update(status="stopped", stop="упал таск %s" % ", ".join(ids))
 
 
 def rung_of(model, effort):
@@ -547,7 +644,7 @@ def check_plan(state):
                     if x.startswith(y) or y.startswith(x):
                         problems.append("таски %s и %s в одной волне пишут в %s"
                                         % (a["id"], b["id"], za if len(za) >= len(zb) else zb))
-    return problems + ls_plan_problems(tickets)
+    return problems + ls_plan_problems(state, tickets)
 
 
 # ── этапы ───────────────────────────────────────────────────────────────────
@@ -1026,6 +1123,7 @@ def cmd_ticket(state, pos, opt):
     known = {t["id"]: t for t in state.get("tickets") or []}
     by_user = opt.get("by-user") if isinstance(opt.get("by-user"), str) else None
     t = now()
+    ls_night_guard(state, act, ids)
     for i in ids:                                    # сначала все отказы — потом запись
         tk = known.get(i)
         if tk is None:
@@ -1068,6 +1166,7 @@ def cmd_ticket(state, pos, opt):
     log(state, "ticket", ids=ids, act=act, tests=tests_pair(opt["tests"]) if opt.get("tests") else None,
         note=opt["note"] if act in ("repair", "fail") and isinstance(opt.get("note"), str)
         else by_user if act == "reset" else None)
+    ls_night_record(state, act, ids)
     return [n for n in notes if n]
 
 
@@ -1289,6 +1388,10 @@ def main():
             notes += cmd_ticket(state, rest, opt)
         elif cmd == "ls-check":
             notes += cmd_ls_check(state)
+        elif cmd == "queue":
+            notes += cmd_queue(state, rest, opt)
+        elif cmd == "night":
+            notes += cmd_night(state, rest, opt)
         elif cmd == "tickets":
             notes.append(publish_tickets(state))
             log(state, "tickets", n=len(state.get("tickets") or []))
