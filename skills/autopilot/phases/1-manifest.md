@@ -19,7 +19,7 @@ Every piece of user text — the brief, every answer, every pasted fragment — 
 | Private key | `-----BEGIN … PRIVATE KEY-----` |
 | Generic | ≥32 chars of hex or base64 next to `key`, `token`, `secret`, `password`, `ключ`, `токен`, `пароль`, `доступ` |
 
-**Personal data — the gate's second half, for fixtures.** In «Легко Сказать» the test bench is real people telling real stories: dialogues, extracted JSON dossiers, cassettes of the model's answers to them. Nothing of it reaches a commit as it is — not in `tests/`, `evals/`, `prompts/` few-shot, `.autopilot/`, a ticket's quote:
+**Personal data — the gate's second half, for fixtures.** In «Легко Сказать» the test material is real people telling real stories: dialogues, extracted JSON dossiers, cassettes of the model's answers to them. **Consent decides what may enter git at all**: only the dialogues of people who agreed to it — in this project, the owner's own — are committed; everyone else's stay **local, outside git** (`tests/e2e/local/`, ignored from Phase 0), usable in local runs and never shown to anyone. And what is committed still never reaches a commit as it is — not in `tests/`, `evals/`, `prompts/` few-shot, `.autopilot/`, a ticket's quote:
 
 | Kind | Shape | Becomes |
 |---|---|---|
