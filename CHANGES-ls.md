@@ -1,6 +1,6 @@
 # autopilot-ls — fork of Autopilot for «Легко Сказать»
 
-**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), tuned for rebuilding «Легко Сказать», a Russian-language Telegram coaching bot (aiogram, SQLite, versioned XML prompts). It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (73: 47 upstream + 26 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
+**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), tuned for rebuilding «Легко Сказать», a Russian-language Telegram coaching bot (aiogram, SQLite, versioned XML prompts). It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (76: 47 upstream + 29 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
 
 ---
 
@@ -13,7 +13,7 @@
 ```bash
 git clone -b ls https://github.com/artmir-tech/autopilot-ls && cd autopilot-ls
 tools/install-ls.sh                          # копия skills/autopilot → ~/.claude/skills/autopilot-ls/
-python3 -m unittest discover -s tests        # 73 теста
+python3 -m unittest discover -s tests        # 76 тестов
 python3 tools/lint-ls.py                     # каждая ссылка на файл навыка существует
 ```
 
@@ -63,6 +63,25 @@ python3 tools/lint-ls.py                     # каждая ссылка на ф
 - `tools/install-ls.sh` (установка), `tools/lint-ls.py` (ссылки на файлы), `skills/autopilot/tools/measure-run.py` (замер прогона — теперь внутри навыка).
 
 Стартовый контекст Фазы 0 вырос примерно на 5 КБ (≈ 1,3K токенов); новые файлы фаз читаются только при надобности.
+
+## Тестовый полёт 2026-11-07 — что нашёл форк на себе
+
+Форк прогнан целиком (`full`, глубина normal) на игрушечном проекте: консольный трекер привычек на Python и SQLite с одним prompt-требованием. Три таска плюс F1 из ревью ветки, волна 2 — как ночная очередь. Итог: всё построено, слепая приёмка 11 из 11, сдача правильно остановлена на «ждёт владельца». Дефекты форка, найденные и починенные по ходу:
+
+| Что сломалось | Правка |
+|---|---|
+| `get_usage` на тарифе отдаёт только недельные окна — пейсинг вокруг 5-часового окна нечем кормить | `ap.py`: если окна 5 ч нет, темп по неделе (80 % — двое, 95 % — стоп), `--weekly-reset` |
+| Worktree исполнителей режутся из репозитория папки сессии | `5-subagents.md`: оркестратор сидит в корне проекта и не уходит из него `cd` |
+| Исполнитель не может писать за пределы своего worktree — лог ub-mode в основной копии не записать | лог в `.autopilot/<папка>/logs/NN.md` worktree, оркестратор переносит его на шаге 2 |
+| Двум из трёх исполнителей среда отклонила команды со словом `eval` | команда кейсов — `make cases`, отклонённую команду не обходить, а называть |
+| Очередь считала таск на точечном ревью несданным — ночь из зависимых не собиралась | «влит» = `done` или `review` с коммитом |
+| В итоги ночи попало закрытие ревью дневного таска | ночь считает только таски своей очереди |
+| A/B не определён для первой версии и для текстов без модели | `5-prompts.md`: «нет прошлой версии» — базовая линия; `model_hint: none` — все проверки детерминированные |
+| Сводка гейтов давала зелёный при пустом разборе; A/B с неизвестным коммитом молча «нет прошлой версии» | `standards/gates.md`, `5-prompts.md`: молчание — красный, неизвестный коммит — ошибка, клоны закреплены |
+| Исполнитель сменил систему сборки без `BLOCKED` | шаг 2 посадки сверяет изменённые манифесты зависимостей с «Решениями» (`D##` или дозапрос) |
+| «Конец сборки» не знал статуса `awaiting_owner` | такой таск не держит ревью ветки, держит только `finish` |
+
+Что сработало как задумано: фильтр пути шаблона, `ls-check`, G2 и G3, `isolation: "worktree"` (путь и ветку harness отдаёт сам), гейты unclebob (CRAP, дубли, мутанты; флаги совпали с README), закрытие ветки по файлам и `merge --ff-only` на сдвинувшуюся основную ветку, точечное ревью и две половины ревью ветки, F1, перепроверка ремонта, HTML-страница обзора владельцу и статус `awaiting_owner`, слепая приёмка из чистого клона, отказ `finish` без слова владельца.
 
 ## Решения, принятые без Артура
 
