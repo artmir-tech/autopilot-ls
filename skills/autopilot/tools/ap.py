@@ -329,8 +329,119 @@ def parse_ticket(path):
         "wave": int(wave.group()) if wave else None,
         "zone": re.findall(r"`([^`]+)`", get("зона", "zone")),
         "review": get("ревью", "review") or None,
-        "model": get("модель", "model") or None,
+        "model": get("модель", "model").lower() or None,
+        "type": get("тип", "type").lower() or None,
+        "effort": get("усилие", "effort").lower() or None,
+        "attention": get("внимание", "attention").lower() or None,
+        "night_ok": yes_no(get("ночью", "night")),
     }
+
+
+# ── форк autopilot-ls: поля таска, лестница моделей, проверки ──────────────
+# Всё, что форк добавил к учёту, — в этом блоке и в cmd_ls_*: так upstream вливается
+# без раскопок. Правила — phases/4-plan.md (поля), 5-repair.md (лестница).
+
+LS_FIELDS = (("type", "Тип", ("code", "prompt", "migration", "e2e", "infra")),
+             ("model", "Модель", ("opus", "sonnet", "haiku")),
+             ("effort", "Усилие", ("low", "medium", "high", "xhigh")),
+             ("attention", "Внимание", ("none", "review", "owner")))
+LADDER = [("haiku", "low"), ("sonnet", "medium"), ("opus", "high"), ("opus", "xhigh")]
+LS_KEEP = ("attempts", "gates", "base")
+
+
+def yes_no(v):
+    """«Ночью: да/нет» → True/False; пусто или непонятно → None (check-plan скажет)."""
+    v = (v or "").strip().lower()
+    return True if v in ("да", "yes", "true") else False if v in ("нет", "no", "false") else None
+
+
+def ls_field_problems(t):
+    out = []
+    for key, name, allowed in LS_FIELDS:
+        v = t.get(key)
+        if not v:
+            out.append("у таска %s нет поля %s" % (t["id"], name))
+        elif v not in allowed:
+            out.append("таск %s: %s «%s» — не из %s" % (t["id"], name, v, " | ".join(allowed)))
+    if t.get("night_ok") is None:
+        out.append("у таска %s нет поля Ночью (да | нет)" % t["id"])
+    elif t["night_ok"] and t.get("attention") == "owner":
+        out.append("таск %s: «Ночью: да» при «Внимание: owner» — ночью владельца нет" % t["id"])
+    return out
+
+
+def ls_wave_problems(tickets):
+    out = []
+    for m in [t for t in tickets if t.get("type") == "migration" and t.get("wave") is not None]:
+        mates = [t["id"] for t in tickets if t is not m and t.get("wave") == m["wave"]]
+        if mates:
+            out.append("таск %s (migration) делит волну %s с %s — миграция летит одна"
+                       % (m["id"], m["wave"], ", ".join(mates)))
+    return out
+
+
+def ls_plan_problems(tickets):
+    return [p for t in tickets for p in ls_field_problems(t)] + ls_wave_problems(tickets)
+
+
+def rung_of(model, effort):
+    if (model, effort) in LADDER:
+        return LADDER.index((model, effort))
+    return {"haiku": 0, "sonnet": 1}.get(model, 3 if effort in ("xhigh", "max") else 2)
+
+
+def next_rung(tk):
+    """Ретрай 1 — та же ступень (haiku поднимается до sonnet); ретрай 2 — на ступень выше
+    ступени ретрая 1. Выше opus·xhigh ступени нет: max — только словами пользователя."""
+    last = (tk.get("attempts") or [{}])[-1]
+    cur = rung_of(last.get("model") or tk.get("model"), last.get("effort") or tk.get("effort"))
+    return LADDER[max(cur, 1) if tk.get("retries", 0) == 0 else min(cur + 1, len(LADDER) - 1)]
+
+
+def record_attempt(state, tk, act, opt):
+    """Ступень каждой попытки — в attempts: по ней следующий план узнаёт, что sonnet не тянет."""
+    if act == "start" and tk.get("attempts") and tk.get("status") != "pending":
+        return None
+    if act == "retry":
+        model, effort = next_rung(tk)
+    elif act == "start":
+        model, effort = tk.get("model"), tk.get("effort")
+    else:
+        return None
+    model = opt.get("model") if isinstance(opt.get("model"), str) else model
+    effort = opt.get("effort") if isinstance(opt.get("effort"), str) else effort
+    tk.setdefault("attempts", []).append({"model": model, "effort": effort, "at": state["updatedAt"]})
+    if act == "retry":
+        return "таск %s, ретрай %d: %s · %s" % (tk["id"], tk.get("retries", 0) + 1, model, effort)
+    return None
+
+
+def record_landing(tk, opt):
+    if isinstance(opt.get("gates"), str):
+        tk["gates"] = opt["gates"]
+    if isinstance(opt.get("base"), str):
+        tk.setdefault("base", opt["base"][:12])
+
+
+def cmd_ls_check(state):
+    """Что форку нужно в репозитории проекта: стандарт кода, игнор worktree, make gates."""
+    out = []
+    if not os.path.isfile(os.path.join(ROOT, "docs", "standards", "ub-mode.md")):
+        out.append("! нет docs/standards/ub-mode.md — скопируй из %s/standards/ub-mode.md"
+                   % (state.get("skillDir") or "<skillDir>"))
+    try:
+        ignore = open(os.path.join(ROOT, ".gitignore"), encoding="utf-8").read()
+    except OSError:
+        ignore = ""
+    if not re.search(r"^/?\.claude/worktrees/?\s*$", ignore, re.M):
+        out.append("! .gitignore без .claude/worktrees/ — допиши строку")
+    try:
+        make = open(os.path.join(ROOT, "Makefile"), encoding="utf-8").read()
+    except OSError:
+        make = ""
+    out.append("make gates есть" if re.search(r"^gates\s*:", make, re.M)
+               else "make gates ещё нет — его строит таск 01 по standards/gates.md")
+    return out
 
 
 def dep_id(ref, ids):
@@ -353,7 +464,7 @@ def publish_tickets(state):
         t = parse_ticket(p)
         prev = old.get(t["id"], {})
         for k in ("status", "startedAt", "finishedAt", "retries", "repairs", "repairFindings",
-                  "tests", "commit", "concerns"):
+                  "tests", "commit", "concerns") + LS_KEEP:
             if k in prev:
                 t[k] = prev[k]
         t.setdefault("status", "pending")
@@ -418,7 +529,7 @@ def check_plan(state):
                     if x.startswith(y) or y.startswith(x):
                         problems.append("таски %s и %s в одной волне пишут в %s"
                                         % (a["id"], b["id"], za if len(za) >= len(zb) else zb))
-    return problems
+    return problems + ls_plan_problems(tickets)
 
 
 # ── этапы ───────────────────────────────────────────────────────────────────
@@ -902,8 +1013,10 @@ def cmd_ticket(state, pos, opt):
         if tk is None:
             die("таска %s нет — сначала `ap.py tickets`" % i)
         refuse_ticket(tk, act, by_user, opt.get("commit") if isinstance(opt.get("commit"), str) else None)
+    notes = []
     for i in ids:
         tk = known[i]
+        notes.append(record_attempt(state, tk, act, opt))
         tk["status"] = TICKET_STATUSES[act]
         if act == "start":
             tk.setdefault("startedAt", t)
@@ -928,6 +1041,7 @@ def cmd_ticket(state, pos, opt):
                 tk["repairs"] = tk["retries"] = 0
         if act == "done":
             close_requirements(state, tk, opt, t)
+            record_landing(tk, opt)
         if opt.get("tests"):
             tk["tests"] = tests_pair(opt["tests"])
             state["tests"] = tk["tests"]
@@ -936,6 +1050,7 @@ def cmd_ticket(state, pos, opt):
     log(state, "ticket", ids=ids, act=act, tests=tests_pair(opt["tests"]) if opt.get("tests") else None,
         note=opt["note"] if act in ("repair", "fail") and isinstance(opt.get("note"), str)
         else by_user if act == "reset" else None)
+    return [n for n in notes if n]
 
 
 def cmd_set(state, pos):
@@ -1144,7 +1259,7 @@ def main():
         if state is None:
             die("state.js ещё нет — начни с `ap.py init`")
         rest = pos[1:]
-        if cmd not in ("", "sync", "commits"):
+        if cmd not in ("", "sync", "commits", "ls-check"):
             # Время события ставится до команды: ей самой и ленте нужна одна метка.
             state["updatedAt"] = now()
             beat(state)
@@ -1153,7 +1268,9 @@ def main():
         if cmd == "stage":
             cmd_stage(state, rest, opt)
         elif cmd == "ticket":
-            cmd_ticket(state, rest, opt)
+            notes += cmd_ticket(state, rest, opt)
+        elif cmd == "ls-check":
+            notes += cmd_ls_check(state)
         elif cmd == "tickets":
             notes.append(publish_tickets(state))
             log(state, "tickets", n=len(state.get("tickets") or []))

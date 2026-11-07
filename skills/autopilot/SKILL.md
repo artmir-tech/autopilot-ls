@@ -28,7 +28,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | 1 Manifest | `phases/1-manifest.md` | `<дата>-brief.md`, `manifest.md` |
 | 2 Briefing | `phases/2-briefing.md` (+ `2-adversarial.md` when it runs) | answers recorded into the manifest |
 | 3 Spec | `phases/3-spec.md` | `notes.md` in existing code, `spec.md`, the boundaries in `interfaces.md` |
-| 4 Plan | `phases/4-plan.md` | `tickets/NN-*.md`, the plan commit |
+| 4 Plan | `phases/4-plan.md`, then `phases/7-instruments.md` before `ap.py tickets` | `tickets/NN-*.md` with type, model, effort, attention, night; the plan commit |
 | 5 Build | `phases/5-subagents.md` | code, one commit per ticket |
 | 6 Review | `phases/6-review.md` — at the first point review, and for the whole-branch review | reviewed code |
 | 8 Final | `phases/8-final.md`, and `phases/9-memory.md` before spawning | blind acceptance, memory, progress file, report |

@@ -68,8 +68,8 @@ Immediately after `init`, before Phase 1 asks anything.
 | a ticket or a whole wave launched | `ticket 02 03 start` — **before** the subagents go out |
 | a ticket goes to point review | `ticket 02 review` |
 | a blocking finding goes back | `ticket 02 repair --note "условие одной строкой"` |
-| a failed ticket restarts | `ticket 02 retry` |
-| committed | `ticket 02 done --tests 34/0 --commit <sha>` — refused without a commit (+ `--placeholder R05` for a stubbed row) — closes the manifest rows whose tickets are all done |
+| a failed ticket restarts | `ticket 02 retry` — prints the rung to launch on (`phases/5-repair.md`) |
+| landed | `ticket 02 done --tests 34/0 --gates "…" --base <sha> --commit <sha>` — refused without a commit (+ `--placeholder R05` for a stubbed row) — closes the manifest rows whose tickets are all done |
 | failed for good | `ticket 02 fail --note "что блокирует"` — after it the ticket refuses every command but the next row |
 | the user unblocked a failed ticket | `ticket 02 reset --by-user "их слова"` — counters back to zero |
 | a deferred finding | `add concerns "файл:строка — что не так"` |
@@ -84,6 +84,8 @@ Immediately after `init`, before Phase 1 asks anything.
 | the run lands | `finish --result "одна строка: что теперь есть"` — refused while a gate is red or unrun, or a ticket is unfinished or has no commit in `HEAD` (`phases/8-final.md`) |
 | the user lands it as it is | `finish --result "…" --by-user "их слова"` — «Сдано с оговорками», what stayed open is recorded |
 | a resume, before anything relaunches | `commits` — every `done` ticket's commit still in `HEAD`; a `!` line is a ticket to reset (`phases/0-resume.md`) |
+
+The fork's own data — ticket type, model, effort, attention, night, the attempts, the queue, the pacing, the program — and its commands are in `phases/7-instruments.md`, read when the run first needs them.
 
 All are `python3 .autopilot/ap.py …`, and `add` takes several values in one call. **Chain a call with the command it belongs to**, so one event is one turn — the commit of a ticket and its `done` go together (`phases/5-subagents.md`, step 7). Never chain a commit after a check whose result you have not read: `| tail` always exits 0.
 

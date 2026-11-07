@@ -36,10 +36,16 @@ def read(path):
         return f.read()
 
 
-def ticket(tid, title, reqs, deps, zone, wave, review="нет", model="обычная"):
+def ticket(tid, title, reqs, deps, zone, wave, review="нет", model="sonnet",
+           kind="code", effort="medium", attention="none", night="нет"):
+    """Шаблон таска форка autopilot-ls: поля Тип, Модель, Усилие, Внимание, Ночью обязательны.
+    Поле со значением None в файл не пишется — так проверяется отказ check-plan."""
+    extra = "".join("**%s:** %s\n" % (k, v) for k, v in (
+        ("Тип", kind), ("Модель", model), ("Усилие", effort), ("Внимание", attention), ("Ночью", night))
+        if v is not None)
     return ("# %s — %s\n\n**Требования:** %s\n**Зависит от:** %s\n**Зона:** %s\n"
-            "**Волна:** %s\n**Ревью:** %s\n**Модель:** %s\n\n## Критерии приёмки\n\n- [ ] что-то\n"
-            % (tid, title, reqs, deps, " · ".join("`%s`" % z for z in zone), wave, review, model))
+            "**Волна:** %s\n**Ревью:** %s\n%s\n## Критерии приёмки\n\n- [ ] что-то\n"
+            % (tid, title, reqs, deps, " · ".join("`%s`" % z for z in zone), wave, review, extra))
 
 
 class Run(unittest.TestCase):
@@ -145,7 +151,8 @@ class Run(unittest.TestCase):
     def plan(self):
         self.init()
         self.write("manifest.md", MANIFEST)
-        self.write("tickets/01-karkas.md", ticket("01", "Каркас", "R01, R05", "—", ["src/core/"], 1, "да — фундамент", "сильная"))
+        self.write("tickets/01-karkas.md", ticket("01", "Каркас", "R01, R05", "—", ["src/core/"], 1, "да — фундамент", "opus",
+                                                         effort="high"))
         self.write("tickets/02-priem.md", ticket("02", "Приём", "R01.1, R02, A01", "01", ["src/bot/"], 2))
 
     def test_tickets_publish_and_move_rows_in_ticket(self):
@@ -603,6 +610,90 @@ class Run(unittest.TestCase):
         self.assertNotIn("таск 01", out)
         self.assertEqual(self.state()["tickets"][1]["status"], "done")   # сбрасывает оркестратор
         self.assertEqual(len(self.state()["log"]), events)               # проверка — не событие
+
+    # ── форк autopilot-ls: поля таска ──────────────────────────────────────
+    def test_ls_ticket_fields_reach_the_state(self):
+        self.plan()
+        self.write("tickets/03-prompt.md", ticket("03", "Промпт коуча", "R02", "01", ["prompts/coach/"], 2,
+                                                  model="opus", kind="prompt", effort="high",
+                                                  attention="review", night="да"))
+        self.ap("tickets")
+        t = {x["id"]: x for x in self.state()["tickets"]}
+        self.assertEqual((t["01"]["type"], t["01"]["model"], t["01"]["effort"]), ("code", "opus", "high"))
+        self.assertEqual((t["03"]["type"], t["03"]["attention"], t["03"]["night_ok"]), ("prompt", "review", True))
+        self.assertIs(t["02"]["night_ok"], False)
+
+    def test_check_plan_refuses_missing_and_unknown_ls_fields(self):
+        self.plan()
+        self.write("tickets/03-x.md", ticket("03", "Икс", "R02", "02", ["src/x/"], 3, model="сильная", effort=None))
+        code, out = self.ap("check-plan")
+        self.assertIn("таск 03: Модель «сильная» — не из opus | sonnet | haiku", out)
+        self.assertIn("у таска 03 нет поля Усилие", out)
+        self.assertNotIn("G3: трасса сходится", out)
+
+    def test_check_plan_refuses_night_for_an_owner_ticket(self):
+        self.plan()
+        self.write("tickets/03-m.md", ticket("03", "Методика", "R02", "02", ["src/m/"], 3,
+                                             attention="owner", night="да"))
+        code, out = self.ap("check-plan")
+        self.assertIn("таск 03: «Ночью: да» при «Внимание: owner»", out)
+
+    def test_check_plan_keeps_a_migration_alone_in_its_wave(self):
+        self.plan()
+        self.write("tickets/03-mig.md", ticket("03", "Миграция", "R02", "01", ["migrations/"], 2, kind="migration"))
+        code, out = self.ap("check-plan")
+        self.assertIn("таск 03 (migration) делит волну 2 с 02 — миграция летит одна", out)
+
+    def test_attempts_record_the_rung_and_retries_climb_the_ladder(self):
+        self.plan()
+        self.write("tickets/02-priem.md", ticket("02", "Приём", "R01.1, R02, A01", "01", ["src/bot/"], 2,
+                                                 model="haiku", effort="low"))
+        self.ap("tickets")
+        self.ap("ticket", "02", "start")
+        code, out = self.ap("ticket", "02", "retry")
+        self.assertIn("ретрай 1: sonnet · medium", out)
+        code, out = self.ap("ticket", "02", "retry")
+        self.assertIn("ретрай 2: opus · high", out)
+        t = {x["id"]: x for x in self.state()["tickets"]}["02"]
+        self.assertEqual([(a["model"], a["effort"]) for a in t["attempts"]],
+                         [("haiku", "low"), ("sonnet", "medium"), ("opus", "high")])
+        self.assertEqual((t["model"], t["effort"]), ("haiku", "low"))      # план не переписывается
+
+    def test_the_ladder_stops_at_opus_xhigh(self):
+        self.plan()
+        self.ap("tickets")
+        self.ap("ticket", "01", "start")
+        self.assertIn("ретрай 1: opus · high", self.ap("ticket", "01", "retry")[1])
+        self.assertIn("ретрай 2: opus · xhigh", self.ap("ticket", "01", "retry")[1])
+
+    def test_done_records_gates_and_base_and_publish_keeps_them(self):
+        self.plan()
+        self.ap("tickets")
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--gates", "crap 7.4 · dry 0 · mutants 9/9",
+                "--base", "0000000aaaa", "--commit", "1111111bbbb")
+        self.ap("tickets")
+        t = {x["id"]: x for x in self.state()["tickets"]}["01"]
+        self.assertEqual((t["gates"], t["base"], t["commit"]),
+                         ("crap 7.4 · dry 0 · mutants 9/9", "0000000aaaa", "1111111bbbb"))
+        self.assertEqual(len(t["attempts"]), 1)
+
+    def test_ls_check_names_what_the_fork_needs(self):
+        self.init()
+        code, out = self.ap("ls-check")
+        self.assertEqual(code, 0, out)
+        self.assertIn("! нет docs/standards/ub-mode.md", out)
+        self.assertIn("! .gitignore без .claude/worktrees/", out)
+        os.makedirs(os.path.join(self.root, "docs", "standards"))
+        with open(os.path.join(self.root, "docs", "standards", "ub-mode.md"), "w") as f:
+            f.write("# ub-mode\n")
+        with open(os.path.join(self.root, ".gitignore"), "a") as f:
+            f.write(".claude/worktrees/\n")
+        with open(os.path.join(self.root, "Makefile"), "w") as f:
+            f.write("check:\n\ttrue\ngates:\n\ttrue\n")
+        code, out = self.ap("ls-check")
+        self.assertNotIn("! ", out)
+        self.assertIn("make gates есть", out)
 
 
 class Pure(unittest.TestCase):
