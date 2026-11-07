@@ -15,7 +15,10 @@ command -v cygpath >/dev/null && TPL=$(cygpath -m "$TPL")   # Windows: C:/…, �
 echo "skillDir = ${TPL%/phases/*}"
 mkdir -p "$A" && cp "$TPL" "$A/dashboard.html" && ln -sfn dashboard.html "$A/index.html"
 cp "${TPL%/phases/*}/tools/ap.py" "$A/ap.py"
+D=$(dirname "$A")/docs/standards; [ -f "$D/ub-mode.md" ] || { mkdir -p "$D" && cp "${TPL%/phases/*}/standards/ub-mode.md" "$D/ub-mode.md"; }
 ```
+
+- **`docs/standards/ub-mode.md` is the project's code standard** — every executor reads it before its first edit (`prompts/executor.md`). The copy happens only when the project has none: a project that already carries its own, perhaps newer or amended, keeps it. It goes into the plan commit with the rest of what the skill wrote.
 
 - **`skillDir` is what every subagent contract hangs on** — `prompts/executor.md` and `prompts/review.md` go down as paths built from it. It goes into `init` below and lives in `state.js`, never only in your context.
 - `find -L` and no unquoted `*` in it: skills are installed through symlinks, which a plain `find` does not follow, and an unmatched glob aborts the whole line in zsh. Empty output → widen the search once by hand and carry on.
