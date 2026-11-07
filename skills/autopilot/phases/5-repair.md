@@ -15,7 +15,7 @@ Two counters, both capped at two: `repairs` (дозапросы) and `retries` (
 | You send | the condition, nothing else | the ticket again, the error, the failing test named, the path now spelled out |
 | Because | it holds why the code is the way it is; a cold reader repairs the symptom and breaks the reason | its context *is* the failure — the same request gets the same answer |
 
-`ap.py ticket NN repair --note "условие одной строкой"` before the message goes out. **A point review comes after the commit**, so its repair is a second commit of the same zone — «T03: ремонт по ревью», the same trailers — and the re-review reads exactly that commit. If a ticket now in flight owns any file of that zone, the дозапрос waits until that ticket lands. A дозапрос is short:
+`ap.py ticket NN repair --note "условие одной строкой"` before the message goes out. **A point review comes after the landing**, so its repair is more commits on the executor's branch — «T03: ремонт по ревью», the same trailers — landed through steps 2–8 of `phases/5-subagents.md` again, and the re-review reads exactly `git diff <прошлый commit таска>..<новый>`. If a ticket now in flight owns any file of that zone, the дозапрос waits until that ticket lands. A дозапрос is short:
 
 ```
 Тест `parses empty address` красный:

@@ -53,7 +53,7 @@ Phase 4 gave every ticket a wave and a zone. **Launch a whole wave in one messag
 - **One event, one message.** Every call of yours re-reads your whole context — at 200K, one call costs about as much as a small subagent's first steps. What one event needs goes out together: the `ap.py` mark, the commit, the next launch, the line to the user. Never a call that only marks, then a call that only launches.
 - **Waiting for the wave is ending your turn** — a background subagent wakes you when it returns. Never spawn an agent, or run a loop, just to wait.
 
-**Without worktrees — the fallback, not the plan.** A harness that cannot isolate puts parallel executors in one checkout. Each touches only its zone (and `.env.example`), you commit exactly the contract's `FILES`, and a check that fails **only in files of zones still being written** is a neighbour's unfinished work, not this ticket's defect: the ticket may land on its own tests green, and the full check runs again when the neighbour lands. Steps 3 and 7 below then run in the main checkout, with no rebase and no merge.
+**Without worktrees — the fallback, not the plan.** A harness that cannot isolate puts parallel executors in one checkout. Then executors do not commit at all — ub-mode's «Commit often» waits for a worktree, and the prompt says so; each touches only its zone (and `.env.example`), you commit exactly the contract's `FILES` in the main checkout (step 3 without the rebase, step 8 without the merge, `--base` still recorded), and a check that fails **only in files of zones still being written** is a neighbour's unfinished work, not this ticket's defect: the ticket may land on its own tests green, and the full check runs again when the neighbour lands.
 
 ## The return contract
 
@@ -82,32 +82,33 @@ In this order:
 1. **Read the contract and its status.** No block → the ticket is not finished; ask for it. `BLOCKED` or `NEEDS_CONTEXT` → `phases/5-repair.md` now. A `CONCERNS` line saying the plan does not hold — a data model, an interface, two requirements colliding — is the build contradicting the plan: `phases/5-repair.md` too. Two `NEEDS_CONTEXT` in one run mean the tickets are too thin across the board.
 
    **`DONE_WITH_CONCERNS` is a `DONE` with entries in the ledger, not a repair.** The ticket goes through every step below like a `DONE`; each `CONCERNS` line becomes `ap.py add concerns "T03 · <файл:строка> — …"` in step 10, and the whole-branch review confirms or drops it. A concern never blocks the commit by itself. Two exceptions, both already routed: a concern that one of the ticket's own requirements is not fully done → point review (step 9); a concern that the plan does not hold → `phases/5-repair.md`.
-2. **Nothing outside `FILES`, nothing missing from it.** `git -C "$WT" status --porcelain`: a changed path outside this ticket's zone and `.env.example` is a дозапрос — put it back or say why it had to change; a changed path inside the zone that `FILES` does not name is a дозапрос too — it would be left out of the commit.
-3. **Commit in the worktree — exactly `FILES`, never `-A`**, then bring it up to the main branch:
+2. **Nothing outside the zone, nothing left behind.** Everything the branch changed — `git -C "$WT" diff --name-only "$MAIN"...HEAD` and `git -C "$WT" status --porcelain` — lies inside this ticket's zone or is `.env.example`; a path outside it is a дозапрос: put it back or say why it had to change. A changed path inside the zone that `FILES` does not name is a дозапрос too — the contract is how the next tickets learn what exists.
+3. **Close the branch — exactly `FILES`, never `-A`.** The executor commits as it goes, in small commits on its own branch (ub-mode, «Commit and Push»); whatever it left uncommitted you commit by name, then bring the branch up to the main one:
 
    ```bash
-   WT=<путь из WORKTREE>; BR=<ветка из WORKTREE>; MAIN=$(git branch --show-current)
-   git -C "$WT" add -- <FILES> && git -C "$WT" commit -qm "T03: приём заявки" \
-     --trailer "Autopilot-Run: 2026-10-10-repair-bot" --trailer "Requirements: R01, R02" -- <FILES> \
+   WT=<путь из WORKTREE>; BR=<ветка из WORKTREE>; MAIN=$(git branch --show-current); BASE=$(git rev-parse --short HEAD)
+   { git -C "$WT" diff --quiet HEAD && [ -z "$(git -C "$WT" ls-files -o --exclude-standard)" ] \
+     || { git -C "$WT" add -- <незакоммиченные из FILES> && git -C "$WT" commit -qm "T03: остаток" \
+          --trailer "Autopilot-Run: 2026-10-10-repair-bot" --trailer "Requirements: R01, R02" -- <те же пути>; }; } \
      && git -C "$WT" rebase -q "$MAIN"
    ```
 
-   The commit happens here, in the executor's branch, so that the check runs on exactly what will land. A rebase conflict means two tickets wrote one file — a plan defect: `git -C "$WT" rebase --abort`, then `phases/5-repair.md`.
+   Every commit of the branch carries the two trailers — the executor got them in its prompt. A rebase conflict means two tickets wrote one file — a plan defect: `git -C "$WT" rebase --abort`, then `phases/5-repair.md`.
 4. **Append its `INTERFACES` to `interfaces.md`** — you, never the executors; parallel writers collide. Two returns claiming one interface is a plan defect: keep the one that fits and re-cut the other.
 5. **Run the check**, full, truncated, in the worktree: `(cd "$WT" && <check> 2>&1 | tail -30)`, **and read it before anything else happens** — green or red, the names of what failed, and the count. Compare the count with the contract: a `DONE` that added criteria and no tests is a дозапрос, and a suite reporting zero tests is red however it exits.
-6. **Then the gates**, on the same tree: `(cd "$WT" && make gates CHANGED=1 BASE="$(git rev-parse "$MAIN")" 2>&1 | tail -15)`. A red gate — CRAP ≥ 10, a duplicate pair ≥ 0.8, a surviving mutant, a red build, typecheck or lint — **is `BLOCKING`**: it goes back as a дозапрос with the gate's lines verbatim, like a red test. Gates that disagree with the contract's `GATES` line are a дозапрос too: the executor reported a run it did not do. Until a ticket has built `make gates` (ticket 01 or the first `infra` ticket, `standards/gates.md` in the skill), this step is skipped with one line in the log; after it, never.
-7. **Red check or red gate → `phases/5-repair.md`.** Nothing lands on red, and nothing is repaired by you. The executor repairs in its own worktree; its fix joins the same commit — `git -C "$WT" add -- <FILES> && git -C "$WT" commit -q --amend --no-edit -- <FILES>` — because the branch has not landed yet. After step 8 it never is amended again.
+6. **Then the gates**, on the same tree: `(cd "$WT" && make gates CHANGED=1 BASE="$BASE" 2>&1 | tail -15)`. A red gate — CRAP ≥ 10, a duplicate pair ≥ 0.8, a surviving mutant — **is `BLOCKING`**: it goes back as a дозапрос with the gate's lines verbatim, like a red test (a red build, typecheck or lint already is — they are in the check). Gates that disagree with the contract's `GATES` line are a дозапрос too: the executor reported a run it did not do. Until a ticket has built `make gates` (ticket 01 or the first `infra` ticket, to `standards/gates.md` in the skill), this step is skipped with one line in the log; after it, never.
+7. **Red check or red gate → `phases/5-repair.md`.** Nothing lands on red, and nothing is repaired by you. The executor repairs in its own worktree and commits the fix on its branch; then steps 2–6 again.
 8. **Land and record — one call:**
 
    ```bash
    git merge -q --ff-only "$BR" \
      && python3 .autopilot/ap.py ticket 03 done --tests 34/0 --gates "crap 7.4 · dry 0 · mutants 38/41" \
-        --commit "$(git rev-parse --short HEAD)"
+        --base "$BASE" --commit "$(git rev-parse --short HEAD)"
    ```
 
-   **`done` without `--commit` is refused, and git refusing the commit is never worked around** — `index.lock`, `Permission denied`, a sandbox error: that is the machine, so `phases/5-repair.md`, «Fail early». The `&&` stays: a ticket is done when its commit is in the main branch. `--ff-only` refused means the main branch moved since step 3: rebase again, steps 5–6 again, then land. Never a merge commit.
+   **`done` without `--commit` is refused, and git refusing to merge is never worked around** — `index.lock`, `Permission denied`, a sandbox error: that is the machine, so `phases/5-repair.md`, «Fail early». The `&&` stays: a ticket is done when its commits are in the main branch. `--ff-only` refused means the main branch moved since step 3: rebase again, steps 5–6 again, then land. Never a merge commit, never a squash.
 
-   `<FILES>` are the contract's paths, plus `.env.example` if the ticket changed it; `--tests` and `--gates` are what steps 5 and 6 actually printed; `--placeholder R05` for each row the contract reports as a stub. One commit per ticket — the user's rollback points. **The trailers make the history searchable after the run is gone**: `Autopilot-Run` is `dir` without `--wip` (ticket numbers restart every run, so `T03` alone names several tickets), `Requirements` the ticket's rows. `git log --grep="R02"` then finds every change a requirement ever caused.
+   **A ticket lands as one contiguous series**: `--base` is where the main branch stood before it, `--commit` its last commit, and `git diff <base>..<commit>` is the whole ticket — what the point reviewer reads and what a rollback undoes. `--tests` and `--gates` are what steps 5 and 6 actually printed; `--placeholder R05` for each row the contract reports as a stub. **The trailers make the history searchable after the run is gone**: `Autopilot-Run` is `dir` without `--wip` (ticket numbers restart every run, so `T03` alone names several tickets), `Requirements` the ticket's rows. `git log --grep="R02"` then finds every change a requirement ever caused.
 
    The worktree stays while a point review or its repair may still need the executor; when the ticket is finished — `git worktree remove "$WT" && git branch -q -d "$BR"`.
 9. **Point review, if the ticket says `Ревью: да`**, or the contract reports one of its requirements as not done: `ap.py ticket NN review`, the reviewer in the background, and straight on to the next step and the next wave (`phases/6-review.md`). Its `BLOCKING` lines, when they come, go to `phases/5-repair.md`.
