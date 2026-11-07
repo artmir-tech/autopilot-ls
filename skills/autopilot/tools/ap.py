@@ -458,15 +458,29 @@ def cmd_queue(state, pos, opt):
     return notes
 
 
+def night_start(state, n):
+    """Новая ночь — или продолжение той, что встала на паузу по окну. Ночь, остановленная
+    падением или недельным капом, до утреннего отчёта (`night end`) не перезапускается."""
+    if n.get("status") == "stopped":
+        die("ночь остановлена (%s) — сначала отчёт и `night end --report …`, потом новая ночь"
+            % (n.get("stop") or "?"))
+    notes = build_queue(state)
+    if n.get("status") in ("paused", "running"):
+        n.update(status="running", resume_at=None)
+        notes.append("ночь продолжается: сделано %d" % len(n.get("done") or []))
+    else:
+        state["night"] = {"date": state["updatedAt"][:10], "status": "running", "startedAt": state["updatedAt"],
+                          "done": [], "failed": [], "stop": None, "report": None,
+                          "weekly_at_start": (state.get("pacing") or {}).get("weekly_used_pct")}
+    log(state, "night", act="start", n=len(state["queue"]["tickets"]))
+    return notes
+
+
 def cmd_night(state, pos, opt):
     act = pos[0] if pos else ""
     n = state.get("night") or {}
     if act == "start":
-        notes = build_queue(state)
-        state["night"] = {"date": state["updatedAt"][:10], "status": "running", "startedAt": state["updatedAt"],
-                          "done": [], "failed": [], "stop": None, "report": None}
-        log(state, "night", act="start", n=len(state["queue"]["tickets"]))
-        return notes
+        return night_start(state, n)
     if act == "stop" and isinstance(opt.get("note"), str) and n:
         n.update(status="stopped", stop=opt["note"])
     elif act == "end" and isinstance(opt.get("report"), str) and n:
@@ -480,14 +494,102 @@ def cmd_night(state, pos, opt):
 def ls_night_guard(state, act, ids):
     """Ночью летит только очередь, и после первого упавшего — ничего (phases/5-night.md)."""
     n = state.get("night") or {}
-    if n.get("status") not in ("running", "stopped") or act not in ("start", "retry"):
+    if n.get("status") not in ("running", "stopped", "paused") or act not in ("start", "retry"):
         return
     if n["status"] == "stopped":
         die("ночь остановлена (%s) — новых запусков до утра нет: отчёт и `night end`" % (n.get("stop") or "?"))
+    if n["status"] == "paused":
+        die("ночь на паузе до %s (окно лимитов) — запусков нет, пока продолжение не скажет `night start`"
+            % (n.get("resume_at") or "сброса окна"))
     q = set((state.get("queue") or {}).get("tickets") or [])
     outside = [i for i in ids if i not in q]
     if outside:
         die("ночью летит только очередь: %s не в ней — `queue` покажет почему" % ", ".join(outside))
+
+
+# ── форк autopilot-ls: пейсинг лимитов (phases/5-subagents.md, «Pacing») ───
+
+EST_BY_RUNG = {("haiku", "low"): 2, ("sonnet", "medium"): 5, ("opus", "high"): 10, ("opus", "xhigh"): 14}
+PACING_KEYS = {"window": "window_used_pct", "weekly": "weekly_used_pct", "reserve": "reserve_pct",
+               "night-weekly-max-pct": "night_weekly_max_pct"}
+WINDOW_TWO, WINDOW_STOP, SHARE = 60, 85, 0.8
+
+
+def num(v):
+    try:
+        f = float(str(v).replace(",", ".").rstrip("%"))
+    except ValueError:
+        die("pacing: «%s» — не число" % v)
+    return int(f) if f == int(f) else f
+
+
+def ticket_est(p, tk):
+    if str(tk["id"]) in (p.get("est_cost_by_ticket") or {}):
+        return p["est_cost_by_ticket"][str(tk["id"])]
+    last = (tk.get("attempts") or [{}])[-1]
+    rung = LADDER[rung_of(last.get("model") or tk.get("model"), last.get("effort") or tk.get("effort"))]
+    return EST_BY_RUNG[rung]
+
+
+def pacing_room(p):
+    return round(SHARE * (100 - (p.get("window_used_pct") or 0) - p.get("reserve_pct", 15)))
+
+
+def resume_at(p):
+    try:
+        t = dt.datetime.fromisoformat(p.get("window_reset_at") or "")
+    except ValueError:
+        return None
+    return (t + dt.timedelta(minutes=5)).isoformat(timespec="seconds")
+
+
+def pacing_verdict(state, p):
+    used = p.get("window_used_pct") or 0
+    if used >= WINDOW_STOP:
+        out = ["стоп: окно %s %% — новых запусков нет; летящие довести до посадки, синк, продолжить в %s"
+               % (used, resume_at(p) or "сброс окна + 5 мин")]
+    else:
+        out = ["окно %s %% · в полёте не больше %d · место под таск %d %%"
+               % (used, 2 if used > WINDOW_TWO else 3, pacing_room(p))]
+    n = state.get("night") or {}
+    if n.get("status") != "running":
+        return out
+    spent = (p.get("weekly_used_pct") or 0) - (n.get("weekly_at_start") or 0)
+    cap = p.get("night_weekly_max_pct", 15)
+    if n.get("weekly_at_start") is not None and spent >= cap:
+        n.update(status="stopped", stop="неделя +%s %% из %s %%" % (spent, cap))
+        out.append("стоп ночи: неделя +%s %% из %s %%" % (spent, cap))
+    elif used >= WINDOW_STOP:
+        n.update(status="paused", resume_at=resume_at(p))
+    return out
+
+
+def cmd_pacing(state, pos, opt, multi):
+    """Окно лимитов из get_usage (или measure-run.py) — в state.js.pacing; вердикт — сколько
+    в полёт и влезает ли таск. Решает арифметика, а не настроение длинного прогона."""
+    p = state.setdefault("pacing", {})
+    p.setdefault("reserve_pct", 15)
+    for flag, key in PACING_KEYS.items():
+        if opt.get(flag) not in (None, True):
+            p[key] = num(opt[flag])
+    for flag, key in (("reset", "window_reset_at"), ("source", "source")):
+        if isinstance(opt.get(flag), str):
+            p[key] = opt[flag]
+    for pair in multi.get("est", []):
+        k, eq, v = pair.partition("=")
+        if not eq:
+            die("pacing --est 03=8 — оценка таска в процентах окна")
+        p.setdefault("est_cost_by_ticket", {})[k] = num(v)
+    p["at"] = state["updatedAt"]
+    if pos[:1] == ["check"]:
+        known = {t["id"]: t for t in state.get("tickets") or []}
+        room = pacing_room(p)
+        return ["%s %s·%s ≈%s %% — %s (место %d %%)"
+                % (i, known[i].get("model"), known[i].get("effort"), ticket_est(p, known[i]),
+                   "можно" if ticket_est(p, known[i]) <= room else "нельзя", room)
+                for i in pos[1:] if i in known]
+    log(state, "pacing", window=p.get("window_used_pct"), weekly=p.get("weekly_used_pct"))
+    return pacing_verdict(state, p)
 
 
 def ls_night_record(state, act, ids):
@@ -1392,6 +1494,8 @@ def main():
             notes += cmd_queue(state, rest, opt)
         elif cmd == "night":
             notes += cmd_night(state, rest, opt)
+        elif cmd == "pacing":
+            notes += cmd_pacing(state, rest, opt, multi)
         elif cmd == "tickets":
             notes.append(publish_tickets(state))
             log(state, "tickets", n=len(state.get("tickets") or []))

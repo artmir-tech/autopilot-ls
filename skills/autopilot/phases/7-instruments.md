@@ -46,6 +46,22 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 
 **«Ночная очередь» on a dashboard** would show `queue.tickets` in order, `queue.skipped` with reasons, and `night` as «идёт · остановлена: <почему> · закончена» with done and failed — the morning report is the same data in words.
 
+## The window — `pacing`
+
+| `state.js` → `pacing` | What | Written by |
+|---|---|---|
+| `window_used_pct` · `window_reset_at` | the 5-hour window: percent used, when it resets | `pacing --window --reset` |
+| `weekly_used_pct` | the weekly limit, percent used | `pacing --weekly` |
+| `reserve_pct` | kept back for reviews and repairs of what flies — 15 unless the owner says otherwise | `pacing --reserve` |
+| `night_weekly_max_pct` | the most of the weekly limit one night may spend — the owner's number, 15 unset | `pacing --night-weekly-max-pct` |
+| `est_cost_by_ticket` | `{id: percent of the window}` — measured or corrected estimates; a ticket without one is estimated by its rung | `pacing --est 03=8` |
+| `source` · `at` | `get_usage` or `measure-run`; when it was read | `pacing --source` |
+| `night.weekly_at_start` | the weekly percent when the night began — what the night's share is counted from | `night start` |
+
+`ap.py pacing` prints the verdict — in flight at most 3 / 2 / none, the room for one ticket, and at 85 % the time to continue; `pacing check 03 05` answers per ticket. At night it also pauses the night at 85 % of the window and stops it at the weekly share.
+
+**«Окно лимитов» on a dashboard** would be two gauges — the window with its reset time, the week with the night's share marked — and the in-flight cap the verdict gives; the morning report's «Цифры» line is the same data in words.
+
 ## Calibration
 
 After a run, `attempts` and `repairs` by `model` answer the one question the heuristic in `phases/4-plan.md` cannot: which kind of ticket the cheaper model really carries. The final report of the run does not show them; the next plan reads them from the archived `state.js`.

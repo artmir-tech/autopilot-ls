@@ -13,7 +13,7 @@ python3 .autopilot/ap.py night start      # строит очередь и от�
 - **Hard stop after the first `failed`.** `ticket NN fail` closes the night by itself: nothing new launches, tickets in flight finish and land or are reset, dependents are not touched. A second failure at night costs a day of the owner untangling two.
 - **A ticket that needs the owner** — `BLOCKED` on a decision, a method question, an outward action — is not a failure: `ap.py ticket NN reset`, `ap.py queue drop NN --note "что нужно от владельца"` (its dependents leave the queue with it), one line for the report, and on to the next.
 - **Nothing outward, ever** — no push, no deploy, no message to anyone. A morning message to the owner in Telegram only if the project memory records their standing permission in their own words.
-- **A budget the owner set** — the night stops at 85 % of the 5-hour window like the day does, and never spends more than `pacing.night_weekly_max_pct` of the weekly limit — the owner's number, written with `ap.py pacing --night-weekly-max-pct N`; unset, 15 % (`phases/5-subagents.md`, «Pacing»).
+- **A budget the owner set** — at 85 % of the 5-hour window the night **pauses** (`ap.py pacing` sets it; a one-off task at the reset + 5 minutes says `/autopilot-ls night` again, and `night start` resumes it); at `pacing.night_weekly_max_pct` of the weekly limit spent since the night began it **stops** for good — the owner's number, written with `ap.py pacing --night-weekly-max-pct N`; unset, 15 % (`phases/5-subagents.md`, «Pacing»).
 
 ## After the queue
 

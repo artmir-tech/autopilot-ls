@@ -52,6 +52,23 @@ Phase 4 gave every ticket a wave and a zone. **Launch a whole wave in one messag
 - `ap.py ticket 02 03 start` goes **before** the launch — one call for the whole wave, **in the same message as the Agent calls**: Bash first, the launches after it.
 - **One event, one message.** Every call of yours re-reads your whole context — at 200K, one call costs about as much as a small subagent's first steps. What one event needs goes out together: the `ap.py` mark, the commit, the next launch, the line to the user. Never a call that only marks, then a call that only launches.
 - **Waiting for the wave is ending your turn** — a background subagent wakes you when it returns. Never spawn an agent, or run a loop, just to wait.
+- **The pacing rules below cap all of this** — «at most three» is the ceiling of a fresh window, not a right.
+
+## Pacing — the 5-hour window
+
+The subscription's limits are the run's real budget: a run that hits the 5-hour wall mid-wave leaves tickets half-built until the window resets. **Before every launch and after every landing**, read the limits and let `ap.py` decide — arithmetic, not mood:
+
+1. **`mcp__ccd_session_mgmt__get_usage`** — the 5-hour window (percent used, reset time) and the weekly limit. Load it with ToolSearch once if it is only listed as deferred.
+2. **`ap.py pacing --window 41 --reset <ISO> --weekly 22 --source get_usage`** — writes `state.js` → `pacing` and prints the verdict; `ap.py pacing check 03 05` says, per ticket, whether its estimate fits.
+3. **Launch only what the verdict allows**:
+   - a ticket starts only if its estimate is **≤ 0.8 of the room left** — `100 − window − reserve`, the reserve **15 %** for reviews and repairs of what is already flying;
+   - the window **over 60 % — at most two in flight**, not three;
+   - **at 85 % — no new launches**: let the flying tickets land (or reset them at the frontier, `phases/0-resume.md`), `ap.py` once more so the dashboard holds, and **a one-off scheduled task «продолжить» at the reset time + 5 minutes** — `create_scheduled_task({fireAt: <то, что напечатал ap.py>, prompt: "/autopilot-ls\nПроект: <абсолютный путь>. Окно лимитов сброшено — продолжи прогон с фронтира. Если команда не сработала — прочитай ~/.claude/skills/autopilot-ls/SKILL.md и следуй ему."})`, only with the owner's standing permission (`phases/5-night.md`, «Starting it»); without it, one line to the user with the time to say `/autopilot-ls`.
+   - **Big tickets go first in a fresh window** — an `opus · high` core of a T3 run at 10 % used, not at 70 %.
+
+**Estimates** are percent of the 5-hour window per ticket, by rung until measured: `haiku·low` 2 · `sonnet·medium` 5 · `opus·high` 10 · `opus·xhigh` 14. They are guesses: after a landing, the window's rise across the ticket goes into `ap.py pacing --est NN=<факт>` for the tickets still to come like it, and after two or three runs the defaults in `ap.py` are rewritten from `state.js`.
+
+**`get_usage` says `not_applicable`** (an API key, not a subscription) — there is no window: the window rules are off, only the money caps (`EVAL_MAX_USD`, `E2E_MAX_USD`) and the night's share hold, and `python3 <skillDir>/tools/measure-run.py <проект>` after each ticket gives the spend in normalised units for the report. **`unavailable`** — ask once more; still nothing → act as at 61 %: two in flight, and a line in the log.
 
 **Without worktrees — the fallback, not the plan.** A harness that cannot isolate puts parallel executors in one checkout. Then executors do not commit at all — ub-mode's «Commit often» waits for a worktree, and the prompt says so; each touches only its zone (and `.env.example`), you commit exactly the contract's `FILES` in the main checkout (step 3 without the rebase, step 8 without the merge, `--base` still recorded), and a check that fails **only in files of zones still being written** is a neighbour's unfinished work, not this ticket's defect: the ticket may land on its own tests green, and the full check runs again when the neighbour lands.
 

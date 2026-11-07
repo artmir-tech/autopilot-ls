@@ -769,6 +769,72 @@ class Run(unittest.TestCase):
         self.assertIn({"id": "02", "why": "нужна методика"}, q["skipped"])
         self.assertIn({"id": "04", "why": "ждёт 02"}, q["skipped"])
 
+    # ── форк autopilot-ls: пейсинг лимитов ─────────────────────────────────
+    def test_pacing_stores_the_window_and_caps_the_flight(self):
+        self.plan()
+        self.ap("tickets")
+        code, out = self.ap("pacing", "--window", "41", "--reset", "2026-11-08T03:10:00+04:00",
+                            "--weekly", "22", "--source", "get_usage")
+        self.assertEqual(code, 0, out)
+        p = self.state()["pacing"]
+        self.assertEqual((p["window_used_pct"], p["weekly_used_pct"], p["reserve_pct"]), (41, 22, 15))
+        self.assertEqual(p["window_reset_at"], "2026-11-08T03:10:00+04:00")
+        self.assertIn("в полёте не больше 3", out)
+        self.assertIn("в полёте не больше 2", self.ap("pacing", "--window", "61")[1])
+        code, out = self.ap("pacing", "--window", "85")
+        self.assertIn("стоп: окно 85 %", out)
+        self.assertIn("продолжить в 2026-11-08T03:15:00+04:00", out)
+
+    def test_pacing_check_compares_the_estimate_with_the_room_left(self):
+        self.plan()
+        self.ap("tickets")
+        self.ap("pacing", "--window", "41", "--reset", "2026-11-08T03:10:00+04:00")
+        code, out = self.ap("pacing", "check", "01", "02")
+        self.assertIn("01 opus·high ≈10 % — можно (место 35 %)", out)
+        self.assertIn("02 sonnet·medium ≈5 % — можно", out)
+        self.ap("pacing", "--window", "75", "--est", "02=7")
+        code, out = self.ap("pacing", "check", "01", "02")
+        self.assertIn("01 opus·high ≈10 % — нельзя (место 8 %)", out)
+        self.assertIn("02 sonnet·medium ≈7 % — можно", out)
+
+    def test_pacing_stops_the_night_at_the_weekly_cap(self):
+        self.night_plan()
+        self.ap("pacing", "--window", "10", "--weekly", "30", "--night-weekly-max-pct", "15")
+        self.ap("night", "start")
+        self.assertEqual(self.state()["night"]["weekly_at_start"], 30)
+        code, out = self.ap("pacing", "--window", "20", "--weekly", "46")
+        self.assertIn("стоп ночи: неделя +16 % из 15 %", out)
+        self.assertEqual(self.state()["night"]["status"], "stopped")
+
+    def test_the_window_pauses_the_night_and_night_start_resumes_it(self):
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("pacing", "--window", "10", "--reset", "2026-11-08T03:10:00+04:00")
+        self.ap("night", "start")
+        self.ap("ticket", "02", "start")
+        self.ap("ticket", "02", "done", "--tests", "4/0", "--commit", "2222222bbbb")
+        self.ap("pacing", "--window", "86")
+        self.assertEqual(self.state()["night"]["status"], "paused")
+        code, out = self.ap("ticket", "03", "start")
+        self.assertIn("ночь на паузе до 2026-11-08T03:15:00+04:00", out)
+        self.ap("pacing", "--window", "3", "--reset", "2026-11-08T08:15:00+04:00")
+        self.ap("night", "start")
+        n = self.state()["night"]
+        self.assertEqual((n["status"], n["done"]), ("running", ["02"]))
+        self.assertEqual(self.ap("ticket", "03", "start")[0], 0)
+
+    def test_a_night_stopped_by_a_failure_does_not_restart_before_its_report(self):
+        self.night_plan()
+        self.ap("ticket", "01", "start")
+        self.ap("ticket", "01", "done", "--tests", "3/0", "--commit", "1111111aaaa")
+        self.ap("night", "start")
+        self.ap("ticket", "02", "start")
+        self.ap("ticket", "02", "fail", "--note", "сеть")
+        code, out = self.ap("night", "start")
+        self.assertNotEqual(code, 0)
+        self.assertIn("сначала отчёт", out)
+
 
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""
