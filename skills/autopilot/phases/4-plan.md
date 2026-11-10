@@ -152,7 +152,7 @@ Calibrate, do not trust: after two or three runs, `repairs` by model in `state.j
 
 ## Before the first ticket flies
 
-**`interfaces.md` carries more than the boundaries** Phase 3 wrote there. Add the project rules an executor cannot derive: stack and versions; how to install — **in a fresh worktree**, since every executor gets one — run, and **one check command** — tests, types and lint together — plus how to run a single test file (ticket 01 creates the check command if the project has none); **the gates command**, `make gates CHANGED=1`, and the code standard, `docs/standards/ub-mode.md`; the test tiers L0 and L1 (`phases/8a-e2e.md`); what must not be touched. **Ticket 01 installs every dependency «Решения по реализации» names** and builds `make gates` to the contract in `standards/gates.md` (by path from `skillDir`, to its executor only); any other dependency comes back from an executor as `BLOCKED` (`phases/5-repair.md`).
+**`interfaces.md` carries more than the boundaries** Phase 3 wrote there. Add the project rules an executor cannot derive: stack and versions; how to install — **in a fresh worktree**, since every executor gets one — run, and **one check command** — tests, types and lint together — plus how to run a single test file (ticket 01 creates the check command if the project has none); **the gates command**, `make gates CHANGED=1`, and the code standard, the `ub-mode` skill; the test tiers L0 and L1 (`phases/8a-e2e.md`); what must not be touched. **Ticket 01 installs every dependency «Решения по реализации» names** and builds `make gates` to the contract in `standards/gates.md` (by path from `skillDir`, to its executor only); any other dependency comes back from an executor as `BLOCKED` (`phases/5-repair.md`).
 
 ## Gate G3, publishing, and the plan commit
 
@@ -161,11 +161,11 @@ Calibrate, do not trust: after two or three runs, `repairs` by model in `state.j
 **Then the plan commit** — the run's first, and the base every later diff is measured from. Run the redaction gate over `.autopilot/` (`phases/1-manifest.md`), then commit exactly the files this skill wrote so far — never anything else in the tree:
 
 ```bash
-git add -A -- .autopilot .gitignore AGENTS.md CLAUDE.md .env.example docs/standards/ub-mode.md && git commit -qm "Autopilot: план сборки" --trailer "Autopilot-Run: <папка>" -- .autopilot .gitignore AGENTS.md CLAUDE.md .env.example docs/standards/ub-mode.md \
+git add -A -- .autopilot .gitignore AGENTS.md CLAUDE.md .env.example && git commit -qm "Autopilot: план сборки" --trailer "Autopilot-Run: <папка>" -- .autopilot .gitignore AGENTS.md CLAUDE.md .env.example \
   && python3 .autopilot/ap.py set baseCommit="$(git rev-parse --short HEAD)"
 ```
 
-Leave out of both lists any file that does not exist, and the memory file if it is the user's own. `<папка>` is `dir` without `--wip`, the same in every commit of the run. **The plan commit must exist before the first executor flies**: a worktree is cut from `HEAD`, and an executor whose checkout lacks the tickets and `ub-mode.md` builds blind.
+Leave out of both lists any file that does not exist, and the memory file if it is the user's own. `<папка>` is `dir` without `--wip`, the same in every commit of the run. **The plan commit must exist before the first executor flies**: a worktree is cut from `HEAD`, and an executor whose checkout lacks the tickets builds blind.
 
 A ticket that exists only in the dialogue is not a ticket — the user is shown a summary of files already on disk.
 

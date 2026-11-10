@@ -10,7 +10,7 @@ metadata:
 
 # Autopilot-ls
 
-Autopilot-ls flies a dictated idea from words to a working project **in one dialogue**, without making the user approve each stage. Every rule it needs lives in `phases/` and `prompts/`; the only outside file is the project's own copy of ub-mode, `docs/standards/ub-mode.md`, which executors read (`prompts/executor.md`).
+Autopilot-ls flies a dictated idea from words to a working project **in one dialogue**, without making the user approve each stage. Every rule it needs lives in `phases/` and `prompts/`; the only outside dependency is the `ub-mode` clean-code skill, which every coding executor and reviewer loads (`prompts/executor.md`).
 
 **A fork of Autopilot 2.2.3 for «Легко Сказать»** — what differs and why is in `CHANGES-ls.md` at the root of the skill's repository. It coexists with an installed `autopilot`: the trigger is `/autopilot-ls`, and the instruments are always copied from this skill's own directory (`phases/0-instruments.md`).
 
@@ -152,7 +152,7 @@ Numbers in this skill — tiers, question counts, wave widths — are **calibrat
 2. **A secret is never requested, echoed or written** — not into a file, a prompt, a commit or a report.
 3. **A fact about the user is never invented.** Prices, texts, addresses, accounts stay visible placeholders.
 4. **An irreversible or outward-facing action is a question** — deploy, publish, pay, message a third party, delete data, rewrite history.
-5. **The orchestrator does not write the project's code.** Its keyboard reaches `.autopilot/`, the memory files, `.gitignore`, `.env.example`, the copy of `docs/standards/ub-mode.md` and git; everything else goes to a subagent (`phases/5-subagents.md`).
+5. **The orchestrator does not write the project's code.** Its keyboard reaches `.autopilot/`, the memory files, `.gitignore`, `.env.example` and git; everything else goes to a subagent (`phases/5-subagents.md`).
 
 ## When to use it
 

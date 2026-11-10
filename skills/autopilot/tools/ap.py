@@ -1393,12 +1393,17 @@ def record_landing(tk, opt):
         tk.setdefault("base", opt["base"][:12])
 
 
+def ub_mode_installed():
+    roots = (os.path.expanduser("~/.claude/skills"), os.path.join(ROOT, ".claude", "skills"))
+    return any(os.path.isfile(os.path.join(r, "ub-mode", "SKILL.md")) for r in roots)
+
+
 def cmd_ls_check(state):
-    """Что форку нужно в репозитории проекта: стандарт кода, игнор worktree, make gates."""
+    """Что форку нужно: навык чистого кода, игнор worktree, make gates."""
     out = []
-    if not os.path.isfile(os.path.join(ROOT, "docs", "standards", "ub-mode.md")):
-        out.append("! нет docs/standards/ub-mode.md — скопируй из %s/standards/ub-mode.md"
-                   % (state.get("skillDir") or "<skillDir>"))
+    if not ub_mode_installed():
+        out.append("! не установлен скилл ub-mode — без него исполнители не начнут: "
+                   "tools/install-ls.sh в репозитории навыка (github.com/unclebob/ub-mode)")
     try:
         ignore = open(os.path.join(ROOT, ".gitignore"), encoding="utf-8").read()
     except OSError:

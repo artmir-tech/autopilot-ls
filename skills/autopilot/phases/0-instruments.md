@@ -15,10 +15,9 @@ command -v cygpath >/dev/null && TPL=$(cygpath -m "$TPL")   # Windows: C:/…, �
 echo "skillDir = ${TPL%/phases/*}"
 mkdir -p "$A" && cp "$TPL" "$A/dashboard.html" && ln -sfn dashboard.html "$A/index.html"
 cp "${TPL%/phases/*}/tools/ap.py" "$A/ap.py"
-D=$(dirname "$A")/docs/standards; [ -f "$D/ub-mode.md" ] || { mkdir -p "$D" && cp "${TPL%/phases/*}/standards/ub-mode.md" "$D/ub-mode.md"; }
 ```
 
-- **`docs/standards/ub-mode.md` is the project's code standard** — every executor reads it before its first edit (`prompts/executor.md`). The copy happens only when the project has none: a project that already carries its own, perhaps newer or amended, keeps it. It goes into the plan commit with the rest of what the skill wrote.
+- **The code standard is the `ub-mode` skill** — every coding executor and every reviewer loads it (`prompts/executor.md`, `prompts/review.md`); it is not copied into the project, so there is one text and it stays current. It costs a couple of thousand tokens per executor, against 60–80K for its cold start. `ls-check` says when it is not installed: then stop, name the fix (`tools/install-ls.sh` in the skill's repository) and do not build without it.
 
 - **`skillDir` is what every subagent contract hangs on** — `prompts/executor.md` and `prompts/review.md` go down as paths built from it. It goes into `init` below and lives in `state.js`, never only in your context.
 - `find -L` and no unquoted `*` in it: skills are installed through symlinks, which a plain `find` does not follow, and an unmatched glob aborts the whole line in zsh. Empty output → widen the search once by hand and carry on.
@@ -33,10 +32,10 @@ D=$(dirname "$A")/docs/standards; [ -f "$D/ub-mode.md" ] || { mkdir -p "$D" && c
 python3 .autopilot/ap.py init --slug telegram-repair-bot --title "Телеграм-бот для заявок на ремонт" \
   --mode semi --depth normal --memory-file AGENTS.md --memory-owner autopilot \
   --skill-dir "<skillDir>" --check-update
-python3 .autopilot/ap.py ls-check      # форк на месте: ub-mode в репо, make gates, поля тасков
+python3 .autopilot/ap.py ls-check      # форк на месте: скилл ub-mode, make gates, поля тасков
 ```
 
-It creates the run directory `<YYYY-MM-DD>-<slug>--wip/` with `tickets/` inside, writes `state.js` with all eight stages (`preflight` active), adds the run's row to `.autopilot/README.md` (writing the file on a new repo), puts `.autopilot/serve.*` into `.gitignore`, raises the server and prints its address. A finished run's `state.js` is archived into that run's directory first; an unfinished one means this is a resume, and `init` refuses (`phases/0-resume.md`).
+It creates the run directory `<YYYY-MM-DD>-<slug>--wip/` with `tickets/` inside, writes `state.js` with all ten stages (`preflight` active), adds the run's row to `.autopilot/README.md` (writing the file on a new repo), puts `.autopilot/serve.*` into `.gitignore`, raises the server and prints its address. A finished run's `state.js` is archived into that run's directory first; an unfinished one means this is a resume, and `init` refuses (`phases/0-resume.md`).
 
 A line starting with **`↑`** means upstream Autopilot moved past the version this fork is built on: put it into the opening block as it is — one line, not a question, never an update mid-run, never `npx skills update` (it would install upstream, not the fork).
 

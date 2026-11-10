@@ -6,14 +6,14 @@
 
 Never two tickets in one context — accumulated context is what makes long sessions start breaking what used to work. At T0 the one ticket goes to one executor like any other.
 
-**You dispatch; you do not build.** Your keyboard reaches `.autopilot/**`, the memory files, `.gitignore`, `.env.example`, the copy of `docs/standards/ub-mode.md`, and git (`add`, `commit`, `status`, `--stat`, `rebase` and `merge --ff-only` of an executor's branch, `worktree remove` — never the diff). Every other file is written by someone whose context dies with the ticket. This is rule 5, and it loses to the two arguments that always arrive — «тут две строки» and «исполнитель не смог, доделаю сам»: a diff you read at ticket 02 is still in your context at ticket 08, and your context is the one that is never refreshed.
+**You dispatch; you do not build.** Your keyboard reaches `.autopilot/**`, the memory files, `.gitignore`, `.env.example`, and git (`add`, `commit`, `status`, `--stat`, `rebase` and `merge --ff-only` of an executor's branch, `worktree remove` — never the diff). Every other file is written by someone whose context dies with the ticket. This is rule 5, and it loses to the two arguments that always arrive — «тут две строки» and «исполнитель не смог, доделаю сам»: a diff you read at ticket 02 is still in your context at ticket 08, and your context is the one that is never refreshed.
 
 ## What an executor gets — paths, not contents
 
 | | |
 |---|---|
 | `prompts/executor.md` | by path (`skillDir` in `state.js`), **required reading before the first edit** — the testing contract, the code standards, what is never allowed, the return format |
-| `docs/standards/ub-mode.md` | by path in the project — the code standard `prompts/executor.md` makes binding, with its two exceptions |
+| the `ub-mode` skill | for `Тип: code`, `migration`, `e2e`, `infra`: the executor loads it itself with the Skill tool, first thing — the clean-code standard `prompts/executor.md` makes binding, with its two exceptions. The launch prompt says so in one line. A contract without `STANDARD: ub-mode` is a дозапрос (`phases/5-repair.md`): code written from memory of the standard is not code written to it. A prompt ticket does not load it |
 | the main checkout | its absolute path: the executor works in its own worktree, but reads `.autopilot/<dir>/` **from the main checkout** — `interfaces.md` grows during the build and is not committed until the end, so the worktree's copy is stale |
 | its ticket | by path; it already carries the verbatim brief quotes |
 | the spec sections the ticket names | `spec.md` by path **and section headings** — not the whole spec, not pasted |

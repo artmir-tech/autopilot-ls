@@ -7,4 +7,8 @@ DST="${HOME}/.claude/skills/autopilot-ls"
 mkdir -p "$DST"
 rsync -a --delete --exclude '__pycache__' "$SRC/" "$DST/"
 grep -q '^name: autopilot-ls$' "$DST/SKILL.md" && echo "autopilot-ls установлен: $DST"
-[ -f "${HOME}/.claude/skills/ub-mode/SKILL.md" ] || echo "! ub-mode не установлен: ~/.claude/skills/ub-mode/SKILL.md"
+# Навык чистого кода, который грузят исполнители и ревьюеры. Уже стоит — не трогаем.
+if [ ! -f "${HOME}/.claude/skills/ub-mode/SKILL.md" ]; then
+  git clone --depth 1 https://github.com/unclebob/ub-mode "${HOME}/.claude/skills/ub-mode" \
+    && echo "ub-mode установлен" || echo "! ub-mode поставить не вышло: см. github.com/unclebob/ub-mode"
+fi

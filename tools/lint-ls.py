@@ -4,7 +4,7 @@
 Запуск из корня репозитория:  python3 tools/lint-ls.py
 Ссылка — путь в обратных кавычках вида phases/…, prompts/…, standards/…, tools/… (от каталога
 навыка) или CHANGES-ls.md, docs/autopilot/… (от корня репозитория). Пути проекта (interfaces.md,
-docs/standards/ub-mode.md проекта и т.п.) — не файлы навыка и не проверяются.
+спецификация проекта и т.п.) — не файлы навыка и не проверяются.
 """
 import glob
 import os

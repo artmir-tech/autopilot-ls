@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SKILL = os.path.join(os.path.dirname(HERE), "skills", "autopilot")
@@ -698,18 +699,19 @@ class Run(Base):
 
     def test_ls_check_names_what_the_fork_needs(self):
         self.init()
-        code, out = self.ap("ls-check")
-        self.assertEqual(code, 0, out)
-        self.assertIn("! нет docs/standards/ub-mode.md", out)
-        self.assertIn("! .gitignore без .claude/worktrees/", out)
-        os.makedirs(os.path.join(self.root, "docs", "standards"))
-        with open(os.path.join(self.root, "docs", "standards", "ub-mode.md"), "w") as f:
-            f.write("# ub-mode\n")
-        with open(os.path.join(self.root, ".gitignore"), "a") as f:
-            f.write(".claude/worktrees/\n")
-        with open(os.path.join(self.root, "Makefile"), "w") as f:
-            f.write("check:\n\ttrue\ngates:\n\ttrue\n")
-        code, out = self.ap("ls-check")
+        with mock.patch.dict(os.environ, {"HOME": self.root}):
+            code, out = self.ap("ls-check")
+            self.assertEqual(code, 0, out)
+            self.assertIn("! не установлен скилл ub-mode", out)
+            self.assertIn("! .gitignore без .claude/worktrees/", out)
+            os.makedirs(os.path.join(self.root, ".claude", "skills", "ub-mode"))
+            with open(os.path.join(self.root, ".claude", "skills", "ub-mode", "SKILL.md"), "w") as f:
+                f.write("# ub-mode\n")
+            with open(os.path.join(self.root, ".gitignore"), "a") as f:
+                f.write(".claude/worktrees/\n")
+            with open(os.path.join(self.root, "Makefile"), "w") as f:
+                f.write("check:\n\ttrue\ngates:\n\ttrue\n")
+            code, out = self.ap("ls-check")
         self.assertNotIn("! ", out)
         self.assertIn("make gates есть", out)
 
