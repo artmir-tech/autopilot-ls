@@ -853,6 +853,8 @@ def scout_candidates(data):
 def cmd_scout_verify(data):
     out = []
     for x in scout_candidates(data):
+        if x.get("closed") or x.get("builtin"):
+            continue                                       # закрытый сервис и стандартная библиотека на GitHub не проверяются
         if not text_of(x.get("repo")):
             out.append("! кандидат без поля repo: %s" % (x.get("what") or x))
             continue
@@ -873,11 +875,13 @@ def cmd_scout_verify(data):
 
 
 def scout_candidate_problems(label, decision, x):
+    if x.get("closed") or x.get("builtin"):
+        return [] if decision == "adopt" else ["%s: закрытое или встроенное можно только подключить (adopt)" % label]
     facts = x.get("facts")
     if not facts:
         return ["%s: %s не проверен — scout verify" % (label, x.get("repo"))]
     out = []
-    if facts.get("archived") and decision != "learn":
+    if facts.get("archived") and decision != "learn" and not text_of(x.get("archivedWhy")):
         out.append("%s: %s в архиве — брать нельзя, можно только изучать" % (label, x["repo"]))
     if facts.get("package") is False:
         out.append("%s: у %s нет такого пакета в реестре" % (label, x["repo"]))
@@ -903,10 +907,12 @@ def scout_capability_problems(c):
         if not c.get("candidates") and not text_of(c.get("searched")):
             out.append("%s: пишем сами, а что искали — не сказано (searched)" % label)
         return out
-    chosen = next((x for x in c.get("candidates") or [] if x.get("repo") == c.get("choice")), None)
+    chosen = next((x for x in c.get("candidates") or [] if c.get("choice") in (x.get("repo"), x.get("name"))), None)
     if chosen is None:
         return out + ["%s: выбран %s, но его нет среди кандидатов" % (label, c.get("choice"))]
     out += scout_candidate_problems(label, decision, chosen)
+    if c.get("paid") and not (text_of(c.get("byUser")) or c.get("asked")):
+        out.append("%s: платное решает владелец — question add, затем поле asked с номером, или его слова в byUser" % label)
     if c.get("core") and decision in ("adopt", "fork") and not text_of(c.get("byUser")):
         out.append("%s отличает продукт: брать готовым можно только словами владельца (byUser)" % label)
     if decision == "fork" and not text_of(c.get("byUser")):

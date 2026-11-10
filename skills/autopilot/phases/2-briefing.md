@@ -88,4 +88,4 @@ No interview: `ap.py stage briefing skip --note "полный автомат —
 
 ## Closing
 
-Gate **G1**: every row has a status; nothing `open` without a recorded reason. Then one line — «Понял. Пишу спецификацию» — and Phase 3. Do not summarise the interview back to the user.
+Gate **G1**: every row has a status; nothing `open` without a recorded reason. Then one line — «Понял. Смотрю, что уже есть готового» — and Phase 2a (`phases/2a-scout.md`). Do not summarise the interview back to the user.

@@ -1332,6 +1332,18 @@ class Scout(Base):
         self.assertEqual((facts["license"], facts["stars"], facts["pushedAt"]), ("MIT", 5000, "2026-10-01"))
         self.assertNotIn("facts", data["products"][0])
 
+    def test_a_closed_service_can_be_chosen_and_paying_for_it_is_the_owners(self):
+        cap = self.capability(choice="ЮKassa", paid=True, candidates=[{"name": "ЮKassa", "closed": True}])
+        self.assertIn("платное решает владелец", self.check(cap)[1])
+        cap["asked"] = 3
+        self.assertIn("GS пройден", self.check(cap)[1])
+
+    def test_an_archived_repo_with_a_living_package_needs_a_reason(self):
+        cap = self.capability()
+        cap["candidates"][0]["facts"]["archived"] = True
+        cap["candidates"][0]["archivedWhy"] = "пакет обновляется, код переехал"
+        self.assertIn("GS пройден", self.check(cap)[1])
+
     def test_a_long_silence_is_said_but_does_not_refuse(self):
         cap = self.capability()
         cap["candidates"][0]["facts"]["pushedAt"] = "2020-01-01"
