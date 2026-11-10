@@ -5,6 +5,7 @@ Configure the repo, pick the project memory, raise the instruments. Decide which
 | On disk | Case | What happens |
 |---|---|---|
 | your own prompt says `role: worker` | **you are a worker of someone else's run** (`phases/5-sessions.md`) | no run at all — never start, resume or write `state.js`; follow the brief and `prompts/executor.md`, return the contract in your `status/NN.json` |
+| the command starts with `product` | **the product chat** | no run at all: `phases/0-product.md` instead of this file |
 | `state.js` with `finishedAt: null`, `updatedAt` under five minutes old **and** the server in `.autopilot/serve.pid` answering | **the run is going on in another window** | nothing — say so in one line and ask which window carries on. With `dispatch: sessions` the other windows are the run's own workers: only the orchestrator writes `state.js`, so there is never a second orchestrator to choose |
 | `state.js` with `finishedAt: null` | **resume** | read `phases/0-resume.md` and follow it instead of this file |
 | `state.js` with `finishedAt` set, or none, `.autopilot/program.md` with a row still to fly, **and a bare `/autopilot-ls`** | **the next run of a program** | `phases/0-program.md` picks the row and its brief; then everything below, `init --program P0N` |

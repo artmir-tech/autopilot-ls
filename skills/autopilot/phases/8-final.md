@@ -1,11 +1,12 @@
 # Phase 8 — Acceptance
 
-`ap.py stage final`. Three subagents, no contact between them, each answering a different question. The blind checker and the ADR agent go out **in one message**; the memory agent goes out when the blind checker has returned, because it needs the commands the checker proved:
+`ap.py stage final`. Four subagents, no contact between them, each answering a different question. The blind checker and the ADR agent go out **in one message**; the memory agent and the newcomer go out when the blind checker has returned, because they need the commands the checker proved:
 
 | Agent | Question | Receives | Never receives |
 |---|---|---|---|
 | blind checker · `opus` | что из брифа сделано | the brief files, the repository | `spec.md`, `manifest.md`, tickets |
 | ADR *(T2+)* | почему сделано именно так и как здесь называются вещи | `spec.md`, `manifest.md`, `interfaces.md`, `notes.md` | the repo |
+| newcomer · `sonnet` *(§1c)* | где новому человеку непонятно или неприятно | the commands the checker ran, «Для кого» from the map | everything else |
 | memory | как этим пользоваться завтра | the repo, the memory file, `interfaces.md`, the tier, the commands the checker ran | `spec.md`, tickets |
 
 ## 1. Blind acceptance — gate G4
@@ -75,6 +76,12 @@ When `state.js` has `program` and the project has an accepted architecture: one 
 
 **The last row of a program**, before `finish`: one more blind check, of the whole program against `.autopilot/program-brief.md`, exactly as above. It is not recorded with `ap.py blind`; one line per drift goes to `ap.py add report` and into «Открытые вопросы».
 
+## 1c. The newcomer
+
+When `.autopilot/experience.md` is a real map and this run changed something a person sees: one subagent, `sonnet` · `medium`, `prompts/newcomer.md`, after the blind verdict and `F2` if there was one. It gets the commands the blind checker proved, the map's «Для кого», and the path `.autopilot/<dir>/newcomer.md` to write. Nothing else: someone who has read the plan is no newcomer.
+
+**It blocks nothing and starts no ticket.** At most five points go to the owner in the report, under «Глазами новичка». What they pick up goes into `.autopilot/product-tasks.md` as `в бриф`, and the next run takes it; the next product chat reads the file too.
+
 ## 2. Memory and ADRs
 
 **Read `phases/9-memory.md` before spawning them** — Moments 3 and 4 there are their whole brief, the glossary included. When the memory file is the user's own, the memory agent writes `memory-proposal.md` instead of touching it.
@@ -90,6 +97,7 @@ Run the check once more first — `ap.py check branch`; `finish` refuses without
 | Решения, принятые за тебя *(full: first in the report)* | `manifest.md` — every `ASSUMPTION` |
 | Готово | **the blind checker's verdict**, not the manifest's `done` rows |
 | Что нужно от тебя | `placeholder` rows + `state.js` → `debt` |
+| Глазами новичка | `newcomer.md`, its points verbatim, when it exists |
 | Что не вошло | `deferred` and `dropped` rows, with their quotes |
 | Что я добавил сверх заказанного | `state.js` → `additions`, checked against the spec's `A##` |
 | Что пошло не по плану | every `D##` row, every failed ticket |

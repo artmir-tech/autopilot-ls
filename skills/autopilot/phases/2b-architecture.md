@@ -28,8 +28,8 @@ python3 .autopilot/ap.py arch start --scope run        # или project
 
 | Step | Who | Model · effort | Gets | Writes |
 |---|---|---|---|---|
-| Design | architect | `opus` · `xhigh` | `prompts/architect.md`, every `*-brief.md`, `manifest.md`, `notes.md`, `.autopilot/prior-art.md`, `standards/architecture-rubric.md`, the project's memory and ADRs | `.autopilot/architecture.md` |
-| Audit | critic, **a fresh one every round** | `opus` · `xhigh` | `prompts/architecture-critic.md`, mode `audit`, the briefs, the manifest, `prior-art.md`, the document, the rubric, the code if any | `.autopilot/architecture-audit/NN.json` |
+| Design | architect | `opus` · `xhigh` | `prompts/architect.md`, every `*-brief.md`, `manifest.md`, `notes.md`, `.autopilot/experience.md`, `.autopilot/prior-art.md`, `standards/architecture-rubric.md`, the project's memory and ADRs | `.autopilot/architecture.md` |
+| Audit | critic, **a fresh one every round** | `opus` · `xhigh` | `prompts/architecture-critic.md`, mode `audit`, the briefs, the manifest, `experience.md`, `prior-art.md`, the document, the rubric, the code if any | `.autopilot/architecture-audit/NN.json` |
 | Score | `ap.py` | — | `ap.py arch round --file .autopilot/architecture-audit/NN.json` | the number, the verdict |
 | Judge | a fresh one, **only when `ap.py` asks** (a round that did not pass and has `blocking` or `major` findings) | `opus` · `medium` | `prompts/architecture-judge.md`, the briefs, the manifest, the document, that round's `NN.json` | `.autopilot/architecture-audit/NN-judge.json`, then `ap.py arch judge --file …` |
 | Repair | the architect again, or a fresh one with the files | `opus` · `xhigh` | `prompts/architect.md`, «Ремонт», the audit file and the judge's file verbatim | the document |

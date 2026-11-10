@@ -37,7 +37,7 @@
 
     python3 .autopilot/ap.py scout verify | check       # гейт GS: что брать готовым
     python3 .autopilot/ap.py arch start | round --file F [--kind confirm|delta|as-built] | status | delta | waive
-    python3 .autopilot/ap.py program [check | plan --result "…" | P05 block --note "…" | P05 pending]
+    python3 .autopilot/ap.py program [check | plan --result "…" | P05 block --note "…" | P05 pending | P00 start | P00 done --note "…"]
     python3 .autopilot/ap.py project [now | change | spend | next-list | url | run | lint]
     python3 .autopilot/ap.py question add | answer N --by-user "…" | list
     python3 .autopilot/ap.py manual add KEY | done KEY --by-user "…"
@@ -720,6 +720,7 @@ def cmd_e2e(state, pos, multi):
 
 PROGRAM = os.path.join(A, "program.md")
 PROGRAM_ROW = re.compile(r"^\|\s*P\d+[a-z]?\s*\|")
+PRODUCT_ROW = "P00"      # продуктовый чат: строка плана и часть прогресса, но не прогон (phases/0-product.md)
 
 
 def program_lines():
@@ -772,6 +773,17 @@ def program_set(pid, status, d=None, result=None, **plan):
     return "программа: %s → %s" % (pid, status)
 
 
+def program_product(pid, act, opt):
+    """Продуктовый чат идёт в общем прогрессе, но state.js у него нет: свою строку он двигает сам."""
+    if pid != PRODUCT_ROW:
+        die("start и done — только для %s, продуктового чата; прогоны двигают init и finish" % PRODUCT_ROW)
+    if act == "start":
+        return program_set(pid, "in-flight", started=now()[:10])
+    if not isinstance(opt.get("note"), str):
+        die("program %s done --note \"что решили, простыми словами\"" % PRODUCT_ROW)
+    return program_set(pid, "landed", result=opt["note"], landed=now()[:10])
+
+
 def cmd_program(pos, opt, multi=None):
     if pos[:1] == ["plan"]:
         return cmd_program_plan(opt)
@@ -783,6 +795,8 @@ def cmd_program(pos, opt, multi=None):
     lines = program_lines()
     if lines is None:
         die("программы нет — .autopilot/program.md пишется по phases/0-program.md")
+    if len(pos) >= 2 and pos[1] in ("start", "done"):
+        return [program_product(pos[0], pos[1], opt)]
     if len(pos) >= 2 and pos[1] in ("block", "pending"):
         if pos[1] == "block" and not isinstance(opt.get("note"), str):
             die("program P03 block --note \"что блокирует\"")
@@ -2209,7 +2223,7 @@ def program_problems(state=None):
                    if not r[k]]
         if missing:
             out.append("%s: не заполнено — %s" % (r["id"], ", ".join(missing)))
-        if not os.path.isfile(os.path.join(BRIEFS, r["id"] + ".md")):
+        if r["id"] != PRODUCT_ROW and not os.path.isfile(os.path.join(BRIEFS, r["id"] + ".md")):
             out.append("%s: нет брифа .autopilot/briefs/%s.md" % (r["id"], r["id"]))
     return out + program_manifest_problems(state, seen)
 
@@ -2758,6 +2772,8 @@ def tests_pair(v):
 def cmd_init(opt):
     if not opt.get("slug"):
         die("init требует --slug")
+    if opt.get("program") == PRODUCT_ROW:
+        die("%s — продуктовый чат, а не прогон: `/autopilot-ls product` (phases/0-product.md)" % PRODUCT_ROW)
     old = read_state()
     notes = []
     if old and not old.get("finishedAt") and not opt.get("force"):

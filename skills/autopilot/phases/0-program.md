@@ -57,6 +57,8 @@ The first session of a big project builds nothing. It goes through the ordinary 
 | `Дней` | you | calendar days, an honest guess. A real week of runs is the calibration, not optimism |
 | `Простыми словами`, `Что это даёт` | you | **the owner's words**: no codes, no jargon. «Подключение моделей», never «LLM-слой» |
 
+**`P00` is the product chat** (`phases/0-product.md`): the first row of any program people will use, and whatever builds for people depends on it. It has no brief file and no folder, and `Тасков` says what it weighs in the whole, usually 2–3. Already held: write it `landed`, with its dates and `Итог`. Not yet: `pending`, and it moves by `ap.py program P00 start` and `program P00 done --note "…"`. Holding the chat again later is not a new row.
+
 `Режим:` and `Глубина:` are the dials of every run started by a bare `/autopilot-ls`. `Параллельно:` stays 1: `ap.py` carries one run per checkout, and the Gantt with it. Above 1 means separate checkouts by hand, and this page will not see them. **Rows go in dependency order**: a run depends only on rows above it, `program check` says so.
 
 ## 3. Cutting the runs
@@ -64,7 +66,7 @@ The first session of a big project builds nothing. It goes through the ordinary 
 - Cut along section 16 of the architecture, «Порядок сборки». Each run a coherent product slice that **lands green on its own**, the groundwork first, by the size rules of `phases/4-plan.md` one level up.
 - **Every live requirement belongs to a run**: the manifest's «Где» column names its `P##`, and `program check` refuses a row left without one. Nothing quietly vanishes between runs either.
 - **Shared resources are dealt out here**: migration numbers, shared files, contracts between runs. Parallel runs that were not told collide — two runs both took migration number three in a real rebuild.
-- **Each run gets two files now.** `.autopilot/briefs/P03.md` is what G2 and G4 will judge against: a quote line «> Фрагмент брифа программы, дословно.» and the verbatim slice of `program-brief.md`, nothing else. `.autopilot/briefs/P03-context.md` is for building: the architecture sections it builds, what it may rely on from the runs before it, and every decision and refusal from the briefing that touches its slice — «SMS не надо» must reach the run that would have built SMS. That is what «the project is already written down» means: a later session needs no memory of this one.
+- **Each run gets two files now.** `.autopilot/briefs/P03.md` is what G2 and G4 will judge against: a quote line «> Фрагмент брифа программы, дословно.» and the verbatim slice of `program-brief.md`, nothing else. `.autopilot/briefs/P03-context.md` is for building: the steps of the experience map it builds, the architecture sections it builds, what it may rely on from the runs before it, and every decision and refusal from the briefing that touches its slice — «SMS не надо» must reach the run that would have built SMS. That is what «the project is already written down» means: a later session needs no memory of this one.
 - Dependencies are runs, not tickets: P03 needs what P02 *landed*, read from P02's `interfaces.md` and `PROGRESS.md`, never from a run still in flight.
 - Cutting is your process decision. **What is in the product is not**: whether a capability is wanted at all stays the owner's.
 
@@ -87,7 +89,7 @@ Its brief: `.autopilot/briefs/P03.md` becomes the run's `<дата>-brief.md`; `
 
 1. **A run lands** → its row is `landed`; the report names the next: «Следующий прогон — “Разговор с автором”. Скажи `/autopilot-ls` в новой сессии — продолжу с него».
 2. **A new session, not this one.** A run leaves the orchestrator's context at its heaviest. With the owner's standing permission — asked once, like the night task (`phases/5-night.md`) — a one-off scheduled task a few minutes ahead says `/autopilot-ls` in a fresh session; without it, the owner says it.
-3. **A bare `/autopilot-ls` with no unfinished run and a program on disk** → the next row: `init --program P03` with the program's mode and depth, and Phase 1 from its brief file. No row runnable → say why in one line and stop. All rows landed, or the command carries a brief → `phases/0-preflight.md`, the table.
+3. **A bare `/autopilot-ls` with no unfinished run and a program on disk** → the next row: `init --program P03` with the program's mode and depth, and Phase 1 from its brief file. The next row is `P00` → no run: «Следующий шаг — продуктовый чат. Открой отдельный чат и скажи `/autopilot-ls product`», and stop. No row runnable → say why in one line and stop. All rows landed, or the command carries a brief → `phases/0-preflight.md`, the table.
 4. **Before the last row lands** — one blind check of the whole program against `program-brief.md` (`phases/8-final.md` §1b).
 
 Night runs never start a new run of the program: the night flies the queue of the run in flight.

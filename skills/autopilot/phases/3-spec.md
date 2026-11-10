@@ -8,6 +8,8 @@
 
 **After a landed run, `carried.md` comes in twice** (`phases/0-preflight.md` §5). Its «Изменено после сборки» goes to the exploring subagent with the brief «эти места менялись после прошлой сборки — опиши их по коду, как они есть сейчас». Its «Договорились» goes into `interfaces.md` under the project rules, word for word, so every executor and reviewer gets it without reading the history: a spec section that would break one is either rewritten or, if the new brief asks for exactly that, put to the user as one line — never decided by you.
 
+**The experience map is an agreement with the owner** (`phases/0-product.md`). Stories follow its steps. Its «Тон» and «Что видно» go into `interfaces.md` under the project rules, verbatim, so every executor of something a person sees has them; its «Никогда» goes into «Запреты» as settled. A spec that needs a different path is a question to the owner, for the product chat.
+
 **This phase does not reopen the interview.** What is still unresolved becomes a `placeholder`. One narrow exception: a genuine fork the briefing missed, where the branches are different projects — ask it once, in one line, with a recommendation. In full there is no exception: decide it and record the `ASSUMPTION`.
 
 ## Depth — the brief is a silhouette

@@ -20,7 +20,7 @@ Never two tickets in one context — accumulated context is what makes long sess
 | `interfaces.md` | by path, read first |
 | the architecture sections the ticket names | `.autopilot/architecture.md` by path and the section numbers from `**Архитектура:**` — not the whole document |
 | `notes.md` | by path, in an existing codebase |
-| `reference.md` | by path, when the ticket builds something the user will look at |
+| `reference.md`, `.autopilot/experience.md` | by path, when the ticket builds something the user will look at |
 | the check command, how to run one test file, the gates command | from `interfaces.md` — so it does not derive them |
 | its log file | `.autopilot/<dir>/logs/NN.md` **inside its worktree** — the harness lets an executor write nowhere else; ub-mode's log goes there uncommitted, the contract carries only the path, and you move it at landing |
 | its zone, and what it must not touch | zones of tickets flying beside it included |

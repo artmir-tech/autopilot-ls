@@ -1845,6 +1845,52 @@ class Project(Base):
         self.assertNotEqual(code, 0)
         self.assertIn("архитектура проекта не принята", out)
 
+    def product_program(self, status="landed"):
+        row = "| P00 | Продукт и аудитория | — | %s | — | — | 3 | 2 | Для кого и как | Понятно, кому и как делаем | — | — |\n" % status
+        self.program(PROGRAM_V2.replace("| P01 | Ядро | — |", row + "| P01 | Ядро | P00 |"))
+
+    def row(self, pid):
+        line = next(x for x in read(os.path.join(self.a, "program.md")).splitlines() if x.startswith("| %s " % pid))
+        return [c.strip() for c in line.strip("|").split("|")]
+
+    def test_the_product_chat_is_a_row_without_a_brief_or_a_run(self):
+        self.product_program()
+        code, out = self.ap("program", "check")
+        self.assertIn("мастер-план сходится", out)
+        self.assertNotIn("P00", out)
+
+    def test_the_product_chat_counts_in_the_progress(self):
+        self.product_program()
+        self.init()
+        self.ap("project")
+        d = self.page_data()
+        self.assertEqual((d["p"]["progress"]["done"], d["p"]["progress"]["total"]), (11, 23))
+        self.assertEqual(d["p"]["runs"][0]["status"], "landed")
+
+    def test_the_product_chat_moves_its_own_row_and_runs_do_not(self):
+        self.product_program("pending")
+        self.assertIn("следующий: P00", self.ap("program")[1])
+        self.ap("program", "P00", "start")
+        self.assertEqual(self.row("P00")[3], "in-flight")
+        code, out = self.ap("program", "P00", "done")
+        self.assertNotEqual(code, 0)
+        self.assertIn("что решили", out)
+        code, out = self.ap("program", "P00", "done", "--note", "Договорились, для кого")
+        self.assertEqual(code, 0, out)
+        cells = self.row("P00")
+        self.assertEqual((cells[3], cells[5]), ("landed", "Договорились, для кого"))
+        self.assertNotEqual(cells[10], "—")
+        self.assertNotEqual(cells[11], "—")
+        code, out = self.ap("program", "P02", "done", "--note", "x")
+        self.assertNotEqual(code, 0)
+        self.assertIn("только для P00", out)
+
+    def test_a_run_cannot_start_on_the_product_row(self):
+        self.product_program("pending")
+        code, out = self.ap("init", "--slug", "p", "--title", "П", "--skill-dir", SKILL, "--program", "P00")
+        self.assertNotEqual(code, 0)
+        self.assertIn("продуктовый чат", out)
+
     def test_the_page_counts_the_whole_project(self):
         self.program()
         self.init()

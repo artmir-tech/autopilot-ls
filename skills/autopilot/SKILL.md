@@ -2,9 +2,9 @@
 name: autopilot-ls
 description: Форк Autopilot для долгой, почти автономной разработки — builds an app, bot or feature end-to-end from a dictated idea (requirements, briefing, prior-art search, architecture audited to 9 of 10, spec, tickets, subagents, review, acceptance) with a live dashboard; a project of several weeks becomes a written master plan of runs with a Gantt, one report for the whole project and a page of decisions for the owner; adds a model and effort per ticket, the ub-mode clean-code skill with deterministic gates, prompt tickets with evals, a night queue, token pacing, worker sessions, an e2e phase with an LLM judge and a program of several runs. Starts only on /autopilot-ls; a bare /autopilot-ls resumes an interrupted run.
 disable-model-invocation: true
-argument-hint: "[full|semi|interview|manual] [strict|deep] [night] что нужно построить или путь к brief.md"
+argument-hint: "[product] [full|semi|interview|manual] [strict|deep] [night] что нужно построить или путь к brief.md"
 metadata:
-  version: "2.2.3-ls.4"
+  version: "2.2.3-ls.5"
   upstream: "nick-vels/skills@5ed4b79 (Autopilot 2.2.3)"
 ---
 
@@ -35,6 +35,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | 6 Review | `phases/6-review.md` — at the first point review, and for the whole-branch review | reviewed code |
 | 8 Final | `phases/8-final.md`, then `phases/8a-e2e.md` after the blind verdict, and `phases/9-memory.md` before spawning the memory agent | blind acceptance, e2e replay, memory, progress file, report |
 | — | `phases/0-resume.md` — instead of preflight, when resuming | |
+| — | `phases/0-product.md` — instead of a run, when `/autopilot-ls product` started the chat | `.autopilot/experience.md`, `.autopilot/product-tasks.md`: who it is for, what they go through, what the brief must ask for |
 | — | `phases/0-program.md` — when `.autopilot/program.md` exists, or the work is over one run | the master plan, a brief per run, the next run picked, the owner's page, questions |
 | — | `phases/5-repair.md` — when a ticket comes back anything but a clean `DONE` | |
 | — | `phases/5-prompts.md` — at the first launch of a `Тип: prompt` ticket | prompts with versions, evals, A/B |

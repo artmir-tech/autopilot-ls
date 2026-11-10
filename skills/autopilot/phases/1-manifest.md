@@ -57,6 +57,19 @@ The redacted brief, **word for word**, into `.autopilot/<dir>/<YYYY-MM-DD>-brief
 - **The text above never changes; the file keeps growing.** Everything the user says later — a cancellation, an addition, a reversal at ticket four — is appended under `## Дополнения`, dated and verbatim. This matters because **both independent checks read the brief and are forbidden the manifest**: a change that reached the manifest but not this file does not exist for G2 and G4.
 - A brief dictated on a **later day** is a new file with that day's date, in the same run directory.
 
+## 2a. What the product chat decided
+
+The product chat (`phases/0-product.md`) is held before the brief, in a chat of its own. What it decided enters here.
+
+| On disk | What happens |
+|---|---|
+| `.autopilot/product-tasks.md` has rows with `Решение` of `в бриф` or `не делаем` and an empty `Взято` | each goes under `## Дополнения`, dated: «из продуктового чата: <слова владельца>», with what must exist and why; a `не делаем` goes in as a refusal. Then `Взято` gets this run's folder. They are the brief now: G2 and G4 judge by them |
+| `.autopilot/experience.md` holds a map, and nothing is left to take | nothing |
+| no `experience.md`, people will use this, and it is new or gets a new path | `semi`, `interview`, `manual`: `ap.py ask briefing --note "продуктовый чат"`, and one question before anything else: «Продуктового чата ещё не было: для кого это и что человек проходит, никто не решал. Открой отдельный чат и скажи `/autopilot-ls product`, этот подождёт. Или идём без него?» Their «без него» goes into `.autopilot/experience.md` as `Карты нет: «<их слова>»`. `full`: `Карты нет: продуктовый чат не проводился`, one `ap.py question add` card, and on |
+| nobody but its author will use it, or edits with no new path for a person | `.autopilot/experience.md`: `Карты нет: <почему, простыми словами>`, and on |
+
+A run reads the map and never writes it. A change to the map belongs to the product chat.
+
 ## 3. Atomise into requirements
 
 Split the brief into the smallest units that can independently be true or false about the finished product, into `.autopilot/<dir>/manifest.md`. Every row carries the **exact words it came from** — a paraphrased requirement drifts exactly like a paraphrased brief.
