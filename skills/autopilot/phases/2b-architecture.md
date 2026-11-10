@@ -2,7 +2,7 @@
 
 `ap.py stage architecture`. The brief says what the product is; the manifest says nothing may vanish; **this phase decides how the product is built so that it is that product** — before the spec, before a single ticket. A boundary chosen by ticket 01 having seen an eighth of the work is the most expensive decision in a long project; a real audit of a rebuild scored 3.6 of 5 two runs in, and ten architectural repairs had to be threaded into briefs already in flight.
 
-An architect designs. A critic who has never met the architect scores the design against a long list. They go round until the score is at least **9 of 10**. You carry files between them and do neither job.
+An architect designs. A critic who has never met the architect scores the design against a long list. A judge throws out what is only taste before anyone repairs it. They go round until the score is at least **9 of 10**, or until the rounds stop helping and the owner has to say. You carry files between them and do none of these jobs.
 
 ## 1. Size first — does this need it, and is it one run at all?
 
@@ -31,20 +31,23 @@ python3 .autopilot/ap.py arch start --scope run        # или project
 | Design | architect | `opus` · `xhigh` | `prompts/architect.md`, every `*-brief.md`, `manifest.md`, `notes.md`, `.autopilot/prior-art.md`, `standards/architecture-rubric.md`, the project's memory and ADRs | `.autopilot/architecture.md` |
 | Audit | critic, **a fresh one every round** | `opus` · `xhigh` | `prompts/architecture-critic.md`, mode `audit`, the briefs, the manifest, `prior-art.md`, the document, the rubric, the code if any | `.autopilot/architecture-audit/NN.json` |
 | Score | `ap.py` | — | `ap.py arch round --file .autopilot/architecture-audit/NN.json` | the number, the verdict |
-| Repair | the architect again, or a fresh one with the files | `opus` · `xhigh` | `prompts/architect.md`, «Ремонт», the audit file verbatim | the document |
+| Judge | a fresh one, **only when `ap.py` asks** (a round that did not pass and has `blocking` or `major` findings) | `opus` · `medium` | `prompts/architecture-judge.md`, the briefs, the manifest, the document, that round's `NN.json` | `.autopilot/architecture-audit/NN-judge.json`, then `ap.py arch judge --file …` |
+| Repair | the architect again, or a fresh one with the files | `opus` · `xhigh` | `prompts/architect.md`, «Ремонт», the audit file and the judge's file verbatim | the document |
 | Confirm | a **second independent critic**, blind | `opus` · `xhigh` | the same as Audit, mode `confirm` — no earlier audit, no mention that one exists | `NN.json`, `arch round --kind confirm` |
 
-Spawn with the Agent tool, `model` and `effort` as in the table — this skill requires those efforts. No worktree: nothing here touches code, and only these two agents and you write in `.autopilot/`.
+Spawn with the Agent tool, `model` and `effort` as in the table — this skill requires those efforts. No worktree: nothing here touches code, and only these agents and you write in `.autopilot/`.
 
-**From the second round on**, the critic's prompt says, after the path list: «После того как поставишь все оценки, открой `<path to the previous NN.json>` и заполни `prior`». Before the scores it must not open it: an old score is an anchor.
+**From the second round on**, the critic's prompt says, after the path list: «После того как поставишь все оценки, открой `<path to the previous NN.json>` и заполни `prior` только по находкам <the ids `arch judge` sent to repair>». Before the scores it must not open it: an old score is an anchor. Findings the judge dismissed are not asked about again.
 
-**`ap.py` does the arithmetic and refuses a bad audit.** A criterion left out, a score without evidence, a score under 9 without a `gap`, a blocking finding on a score above 7, an earlier finding left unanswered: the whole file goes back to the critic. You never average anything and you never edit a critic's file.
+**`ap.py` does the arithmetic and refuses a bad audit.** A criterion left out, a score without evidence, a score under 9 without a `gap`, a blocking finding on a score above 7, an earlier finding left unanswered: the whole file goes back to the critic. A verdict missing for a serious finding, a verdict on something the critic did not find, an owner's question dismissed: the whole file goes back to the judge. You never average anything and you never edit a critic's or a judge's file.
 
 Reading the verdict:
 
+- **«судья»** — the next round is refused until it has run. `preference` and `refuted` leave the round for good and repair gets only `real` and `risk`. The judge may take a round over the threshold: a criterion held at 7 only by a blocking finding that was dismissed no longer holds the floor, and the confirming critic still looks at it blind.
 - **«ещё круг»** — the architect repairs, a new critic audits.
 - **«порог взят — теперь подтверждение»** — the confirming critic. A score that only the first critic gave is one opinion; two blind ones agreeing is a result.
 - **«GA пройден»** — `ap.py stage architecture done`, on to §5.
+- **«стоп: серьёзных находок не стало меньше»** — two `audit` rounds in a row, counted after the judge. A round costs a few hundred thousand tokens, and this one bought nothing. §4.
 - **«потолок кругов»** — six rounds, audits and confirmations together. Each new look finds something new, and a design that has not reached 9 in six rounds has a question in it that the architect cannot answer. §4.
 
 **Tell the user two lines at the end**: the score, and the one thing the design decided that they would most want to know. In `manual`, the document is a gate: `ap.py ask spec`, show section 1, section 2 and section 18, wait for «ок».
@@ -62,7 +65,7 @@ python3 .autopilot/ap.py question add --title "…" --about "…" --agrees "…"
 - `semi`, `interview`, `manual`: ask before the next round when the answer changes the design — `ap.py ask briefing --note "…"` and the text of `ap.py question list` in the chat. A question that does not change it waits for the next list.
 - `full`: the recommendation is taken, recorded as an `ASSUMPTION` row, and listed in the report.
 
-**At the ceiling, in every mode**: `ap.py ask stop --note "…"`; say what is missing in plain words, what you recommend, and what going ahead would risk. Only on their answer: `ap.py arch waive --by-user "<их слова>"`. The page then shows the real score and «принято с оговоркой», never a nine.
+**At the stop or the ceiling, in every mode, `full` too**: `ap.py ask stop --note "…"`; say what is missing in plain words, what you recommend, and what going ahead would risk. Only on their answer: `ap.py arch continue --by-user "<их слова>"` for one more round after a stop (a ceiling has no «one more»), or `ap.py arch waive --by-user "<их слова>"`. After a waive the page shows the real score and «принято с оговоркой», never a nine.
 
 ## 5. What reads it afterwards
 

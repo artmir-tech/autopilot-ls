@@ -1037,6 +1037,8 @@ ARCH_DELTA_ROUNDS = 3    # кругов на одно изменение при�
 ARCH_MIN_SCENARIOS = 5
 ARCH_SEVERITIES = ("blocking", "major", "minor")
 ARCH_KINDS = ("audit", "confirm", "delta", "as-built")
+ARCH_VERDICTS = ("real", "risk", "preference", "refuted")
+ARCH_DISMISSED = ("preference", "refuted")   # снятое судьёй в ремонт не идёт
 
 
 def arch_read():
@@ -1125,8 +1127,11 @@ def arch_audit_problems(audit, expected_prior):
     return out
 
 
-def arch_score(audit):
-    """Общий балл — взвешенное среднее по применимым критериям; минимум и всё, что ниже порога."""
+def arch_score(audit, cleared=()):
+    """Общий балл — взвешенное среднее по применимым критериям; минимум и всё, что ниже порога.
+
+    cleared — критерии, которые держала на семёрке только снятая судьёй блокирующая находка:
+    в среднем они остаются, порог минимума больше не держат."""
     total = weight = 0
     scored = []
     for key, w, _, _ in ARCH_CRITERIA:
@@ -1134,20 +1139,45 @@ def arch_score(audit):
         if "na" not in c:
             total += w * c["score"]
             weight += w
-            scored.append((key, c["score"]))
+            if key not in cleared:
+                scored.append((key, c["score"]))
     below = ["%s %s" % pair for pair in scored if pair[1] < ARCH_FLOOR]
-    return round(total / weight, 2), min(s for _, s in scored), below
+    return round(total / weight, 2), min((s for _, s in scored), default=10), below
 
 
 def arch_used(a, kinds):
     return sum(1 for r in a.get("rounds") or [] if r.get("kind") in kinds)
 
 
+def arch_gated(a):
+    """Круги, которые двигают гейт: сверка с кодом (as-built) на принятие не влияет."""
+    return [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"]
+
+
+def arch_serious(r):
+    return len(r.get("blocking", [])) + len(r.get("major", []))
+
+
+def arch_passes(r):
+    return (r["overall"] >= ARCH_PASS and r["floor"] >= ARCH_FLOOR
+            and not r["blocking"] and not r["unclosed"] and not r["broken"])
+
+
+def arch_awaits_judge(r):
+    return r["kind"] != "as-built" and not r["passed"] and arch_serious(r) > 0 and not r.get("judged")
+
+
+def arch_judge_due(a):
+    """Владелец принял архитектуру словами — круг, оставшийся без судьи, судить уже незачем."""
+    last = arch_gated(a)[-1:]
+    return bool(last) and arch_awaits_judge(last[0]) and not (a.get("gate") or {}).get("waived")
+
+
 def arch_expected_prior(a, kind):
     """Прошлые находки сверяет только обычный круг: подтверждающий критик их не видит — он слепой."""
     if kind not in ("audit", "delta"):
         return []
-    rounds = [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"]
+    rounds = arch_gated(a)
     if not rounds or rounds[-1].get("passed"):
         return []
     return rounds[-1].get("blocking", []) + rounds[-1].get("major", [])
@@ -1156,18 +1186,18 @@ def arch_expected_prior(a, kind):
 def arch_record(a, kind, rel, audit):
     overall, floor, below = arch_score(audit)
     findings = audit["findings"]
-    earlier = [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"][-1:]
+    earlier = arch_gated(a)[-1:]
     was_blocking = set(earlier[0].get("blocking", [])) if earlier else set()
     unclosed = [p["id"] for p in audit.get("prior") or [] if not p.get("closed") and p.get("id") in was_blocking]
     broken = [s["name"] for s in audit.get("scenarios") or [] if s.get("verdict") == "ломается"]
     blocking = [f["id"] for f in findings if f["severity"] == "blocking"]
-    return {"n": len(a.get("rounds") or []) + 1, "kind": kind, "at": now(), "file": rel,
-            "overall": overall, "floor": floor, "below": below, "blocking": blocking,
-            "major": [f["id"] for f in findings if f["severity"] == "major"],
-            "unclosed": unclosed, "broken": broken, "summary": audit["summary"],
-            "owner": [f["id"] for f in findings if f.get("owner")],
-            "passed": overall >= ARCH_PASS and floor >= ARCH_FLOOR
-            and not blocking and not unclosed and not broken}
+    rec = {"n": len(a.get("rounds") or []) + 1, "kind": kind, "at": now(), "file": rel,
+           "overall": overall, "floor": floor, "below": below, "blocking": blocking,
+           "major": [f["id"] for f in findings if f["severity"] == "major"],
+           "unclosed": unclosed, "broken": broken, "summary": audit["summary"],
+           "owner": [f["id"] for f in findings if f.get("owner")]}
+    rec["passed"] = arch_passes(rec)
+    return rec
 
 
 def arch_line(r):
@@ -1180,6 +1210,10 @@ def arch_line(r):
         tail.append("не закрыто с прошлого круга: " + ", ".join(r["unclosed"]))
     if r["broken"]:
         tail.append("ломаются сценарии: " + "; ".join(r["broken"]))
+    if r.get("dismissed"):
+        tail.append("судья снял: " + ", ".join(d["id"] for d in r["dismissed"]))
+    if r.get("stalled"):
+        tail.append("остановка: серьёзных находок не стало меньше")
     return "круг %d (%s): %s из 10, минимум %s%s" % (
         r["n"], r["kind"], r["overall"], r["floor"], " · " + " · ".join(tail) if tail else "")
 
@@ -1203,11 +1237,27 @@ def arch_gate_step(a, rec):
     arch_set_gate(a, rec, False)
     if kind == "audit" and passed:
         return "порог взят — теперь подтверждение: новый критик вслепую, `arch round --kind confirm`"
+    if arch_awaits_judge(rec):
+        return "судья: разобрать серьёзные находки (%d), затем `arch judge --file .autopilot/architecture-audit/NN-judge.json`" % arch_serious(rec)
     if arch_used(a, ("delta",)) - a.get("deltaBase", 0) >= ARCH_DELTA_ROUNDS and kind == "delta":
         return "! потолок кругов на изменение (%d): вопрос владельцу — `ask stop`, затем `arch waive --by-user`" % ARCH_DELTA_ROUNDS
     if arch_used(a, ("audit", "confirm")) >= ARCH_MAX_ROUNDS:
         return "! потолок кругов (%d): вопрос владельцу — `ask stop`, затем `arch waive --by-user`" % ARCH_MAX_ROUNDS
+    if rec.get("stalled"):
+        return ("! стоп: серьёзных находок не стало меньше (было %d, стало %d), вопрос владельцу — `ask stop`, "
+                "затем `arch continue --by-user` или `arch waive --by-user`") % (rec["stalled"]["was"], rec["stalled"]["now"])
     return "ещё круг: архитектор чинит находки, потом новый критик"
+
+
+def arch_load(rel, what):
+    path = rel if os.path.isabs(rel) else os.path.join(ROOT, rel)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return path, json.load(f)
+    except OSError:
+        die("нет файла %s" % rel)
+    except ValueError as e:
+        die("%s — не JSON: %s" % (what, e))
 
 
 def arch_round(a, opt):
@@ -1218,14 +1268,7 @@ def arch_round(a, opt):
         die("arch round --file .autopilot/architecture-audit/NN.json — файл критика")
     if kind != "as-built":
         arch_round_allowed(a, kind)
-    path = opt["file"] if os.path.isabs(opt["file"]) else os.path.join(ROOT, opt["file"])
-    try:
-        with open(path, encoding="utf-8") as f:
-            audit = json.load(f)
-    except OSError:
-        die("нет файла %s" % opt["file"])
-    except ValueError as e:
-        die("файл аудита — не JSON: %s" % e)
+    path, audit = arch_load(opt["file"], "файл аудита")
     problems = arch_audit_problems(audit, arch_expected_prior(a, kind))
     if problems:
         die("аудит не принят — верни его критику:\n  ! " + "\n  ! ".join(problems))
@@ -1237,7 +1280,95 @@ def arch_round(a, opt):
     return [arch_line(rec), step]
 
 
+def arch_verdict_problems(rec, verdicts):
+    """Судья отвечает ровно на серьёзные находки круга: своих не добавляет, ни одной не пропускает."""
+    serious, out = rec["blocking"] + rec["major"], []
+    ids = [v.get("id") for v in verdicts]
+    for v in verdicts:
+        label = v.get("id") or "вердикт без id"
+        if v.get("id") not in serious:
+            out.append("%s: такой серьёзной находки в круге нет — свои находки судья не добавляет" % label)
+        if v.get("verdict") not in ARCH_VERDICTS:
+            out.append("%s: вердикт — real, risk, preference или refuted" % label)
+        if not text_of(v.get("why")):
+            out.append("%s: вердикт без причины" % label)
+        if v.get("verdict") in ARCH_DISMISSED and v.get("id") in rec.get("owner", []):
+            out.append("%s: это вопрос владельца, судья его не снимает" % label)
+    twice = sorted({str(i) for i in ids if ids.count(i) > 1})
+    if twice:
+        out.append("два вердикта на одну находку: " + ", ".join(twice))
+    missing = [i for i in serious if i not in ids]
+    if missing:
+        out.append("нет вердикта по находкам: " + ", ".join(missing))
+    return out
+
+
+def arch_cleared(audit, standing, dismissed):
+    """Блокирующая находка по правилу ap.py держит критерий не выше 7; снята — правило больше не держит."""
+    where = {f["id"]: f["criterion"] for f in audit["findings"] if f["severity"] == "blocking"}
+    return {where[i] for i in dismissed if i in where} - {where[i] for i in standing}
+
+
+def arch_stall(a, rec):
+    """Обычный круг сравниваем только с обычным кругом прямо перед ним; считаем после судьи."""
+    gated = arch_gated(a)
+    before = gated[gated.index(rec) - 1] if gated.index(rec) else None
+    if rec["kind"] != "audit" or rec["passed"] or not before or before["kind"] != "audit":
+        return None
+    was, count = arch_serious(before), arch_serious(rec)
+    return {"was": was, "now": count} if count and count >= was else None
+
+
+def arch_apply_verdicts(a, rec, verdicts):
+    out = {v["id"]: v for v in verdicts if v["verdict"] in ARCH_DISMISSED}
+    rec["dismissed"] = [{"id": i, "verdict": v["verdict"], "why": v["why"]} for i, v in out.items()]
+    rec["blocking"] = [i for i in rec["blocking"] if i not in out]
+    rec["major"] = [i for i in rec["major"] if i not in out]
+    rec["judged"] = now()
+    _, audit = arch_load(rec["file"], "файл аудита")
+    rec["overall"], rec["floor"], rec["below"] = arch_score(audit, arch_cleared(audit, rec["blocking"], out))
+    rec["passed"] = arch_passes(rec)
+    stall = arch_stall(a, rec)
+    if stall:
+        rec["stalled"] = stall
+
+
+def arch_judge(a, opt):
+    if not isinstance(opt.get("file"), str):
+        die("arch judge --file .autopilot/architecture-audit/NN-judge.json — файл судьи")
+    if not arch_judge_due(a):
+        die("судить нечего: судья нужен один раз, после непройденного круга с серьёзными находками")
+    _, data = arch_load(opt["file"], "файл судьи")
+    verdicts = data.get("verdicts") if isinstance(data, dict) else None
+    if not isinstance(verdicts, list) or not all(isinstance(v, dict) for v in verdicts):
+        die("в файле судьи нет списка verdicts")
+    rec = arch_gated(a)[-1]
+    problems = arch_verdict_problems(rec, verdicts)
+    if problems:
+        die("вердикт судьи не принят — верни его судье:\n  ! " + "\n  ! ".join(problems))
+    arch_apply_verdicts(a, rec, verdicts)
+    step = arch_gate_step(a, rec)
+    arch_write(a)
+    arch_mirror(a)
+    left = rec["blocking"] + rec["major"]
+    return [arch_line(rec), "в ремонт: " + ", ".join(left) if left else "серьёзных находок не осталось", step]
+
+
+def arch_continue(a, opt):
+    if not isinstance(opt.get("by-user"), str):
+        die("arch continue --by-user \"«слова владельца»\" — ещё один круг после остановки только его словами")
+    last = arch_gated(a)[-1:]
+    if not last or not last[0].get("stalled"):
+        die("остановки нет — продолжать нечего")
+    last[0]["stalled"] = False
+    last[0]["continued"] = opt["by-user"]
+    arch_write(a)
+    return ["ещё один круг разрешён словами владельца: архитектор чинит находки, потом новый критик"]
+
+
 def arch_round_allowed(a, kind):
+    if arch_judge_due(a):
+        die("сначала судья: prompts/architecture-judge.md, затем arch judge --file …")
     if a.get("delta") and kind != "delta":
         die("идёт изменение архитектуры — круг только --kind delta")
     if kind == "delta":
@@ -1250,7 +1381,9 @@ def arch_round_allowed(a, kind):
         die("архитектура уже принята; изменить её — arch delta --note \"что меняется\"")
     if arch_used(a, ("audit", "confirm")) >= ARCH_MAX_ROUNDS:
         die("потолок кругов (%d): вопрос владельцу — ask stop, затем arch waive --by-user \"«…»\"" % ARCH_MAX_ROUNDS)
-    last = [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"][-1:]
+    last = arch_gated(a)[-1:]
+    if last and last[0].get("stalled"):
+        die("стоп: серьёзных находок не стало меньше — вопрос владельцу: ask stop, затем arch continue --by-user \"«…»\" или arch waive --by-user \"«…»\"")
     if kind == "confirm" and not (last and last[0].get("passed") and last[0].get("kind") == "audit"):
         die("подтверждать нечего: сначала обычный круг, набравший порог")
 
@@ -1294,6 +1427,10 @@ def cmd_arch(pos, opt, multi=None):
         die("аудита ещё не было — arch start")
     if act == "round":
         return arch_round(a, opt)
+    if act == "judge":
+        return arch_judge(a, opt)
+    if act == "continue":
+        return arch_continue(a, opt)
     if act == "status":
         return arch_status(a)
     if act == "waive":
@@ -1316,7 +1453,7 @@ def cmd_arch(pos, opt, multi=None):
         arch_write(a)
         arch_mirror(a)
         return ["изменение архитектуры открыто: архитектор правит документ, потом `arch round --kind delta`"]
-    die("arch start | round | status | waive | delta")
+    die("arch start | round | judge | continue | status | waive | delta")
 
 
 def ls_arch_guard(state):
@@ -2198,7 +2335,7 @@ def project_arch():
     a = arch_read()
     if not a or not a.get("rounds"):
         return None
-    gated = [r for r in a["rounds"] if r.get("kind") != "as-built"]
+    gated = arch_gated(a)
     last = gated[-1] if gated else a["rounds"][-1]
     g = a.get("gate") or {}
     audit = json_read(os.path.join(ROOT, last["file"]), {})
@@ -2206,7 +2343,7 @@ def project_arch():
     names = [(n, crit[k]) for k, _, n, _ in ARCH_CRITERIA if k in crit and "na" not in crit[k]]
     built = [r for r in a["rounds"] if r.get("kind") == "as-built"][-1:]
     label = ("Принята с оговоркой владельца" if g.get("waived") else "Принята, подтвердил второй критик") if g.get("ok") \
-        else "Идёт доработка"
+        else ("Ждёт решения владельца" if last.get("stalled") else "Идёт доработка")
     return {"score": last["overall"], "pass": ARCH_PASS, "ok": bool(g.get("ok")), "statusLabel": label,
             "summary": last.get("summary") or "",
             "rounds": [{"n": i + 1, "overall": r["overall"], "kind": r["kind"]} for i, r in enumerate(gated)],

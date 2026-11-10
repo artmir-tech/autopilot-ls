@@ -1062,6 +1062,125 @@ class Architecture(Base):
     def start(self):
         self.ap("arch", "start", "--scope", "project")
 
+    @staticmethod
+    def finding(fid, severity="major", criterion="data", **over):
+        return dict({"id": fid, "severity": severity, "criterion": criterion, "what": "нет миграций", "fix": "описать"}, **over)
+
+    def judge(self, n, **verdicts):
+        body = {"verdicts": [{"id": i, "verdict": v, "why": "§4 это решает"} for i, v in verdicts.items()]}
+        rel = ".autopilot/architecture-audit/%02d-judge.json" % n
+        with open(os.path.join(self.root, rel), "w", encoding="utf-8") as f:
+            json.dump(body, f, ensure_ascii=False)
+        return self.ap("arch", "judge", "--file", rel)
+
+    def rounds_with(self, *counts):
+        """Круги audit с заданным числом серьёзных находок, каждый разобран судьёй: всё настоящее."""
+        for n, count in enumerate(counts, 1):
+            ids = ["A%d" % i for i in range(1, count + 1)]
+            before = ["A%d" % i for i in range(1, counts[n - 2] + 1)] if n > 1 else []
+            code, out = self.audit(n, 8, findings=[self.finding(i) for i in ids],
+                                   prior=[{"id": i, "closed": True} for i in before])
+            self.assertEqual(code, 0, out)
+            code, out = self.judge(n, **{i: "real" for i in ids})
+            self.assertEqual(code, 0, out)
+        return out
+
+    def test_no_fewer_serious_findings_stops_and_asks_the_owner(self):
+        self.start()
+        out = self.rounds_with(2, 2)
+        self.assertIn("не стало меньше (было 2, стало 2)", out)
+        self.assertTrue(self.status()["rounds"][1]["stalled"])
+        code, out = self.audit(3, 9.2, prior=[{"id": "A1", "closed": True}, {"id": "A2", "closed": True}])
+        self.assertNotEqual(code, 0)
+        self.assertIn("стоп", out)
+
+    def test_fewer_serious_findings_go_on(self):
+        self.start()
+        out = self.rounds_with(13, 9)
+        self.assertIn("ещё круг", out)
+        self.assertFalse(self.status()["rounds"][1].get("stalled"))
+
+    def test_more_rounds_only_on_the_owners_words(self):
+        self.start()
+        self.rounds_with(1, 1)
+        code, out = self.ap("arch", "continue")
+        self.assertNotEqual(code, 0)
+        self.assertIn("слова владельца", out)
+        code, out = self.ap("arch", "continue", "--by-user", "«давай ещё один»")
+        self.assertEqual(code, 0, out)
+        code, out = self.audit(3, 8.5, prior=[{"id": "A1", "closed": True}])
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.status()["rounds"][1]["continued"], "«давай ещё один»")
+
+    def test_the_stop_is_counted_after_the_judge(self):
+        self.start()
+        self.audit(1, 8, findings=[self.finding("A1"), self.finding("A2"), self.finding("A3")])
+        self.judge(1, A1="real", A2="real", A3="real")
+        closed = [{"id": i, "closed": True} for i in ("A1", "A2", "A3")]
+        self.audit(2, 8, findings=[self.finding("A1"), self.finding("A2"), self.finding("A3"), self.finding("A4")], prior=closed)
+        code, out = self.judge(2, A1="real", A2="refuted", A3="preference", A4="risk")
+        self.assertIn("ещё круг", out)
+        self.assertFalse(self.status()["rounds"][1].get("stalled"))
+
+    def test_a_confirmation_is_not_compared_with_an_audit(self):
+        self.start()
+        self.audit(1, 9.2)
+        self.audit(2, 8.5, kind="confirm", findings=[self.finding("A1"), self.finding("A2")])
+        code, out = self.judge(2, A1="real", A2="real")
+        self.assertIn("ещё круг", out)
+        self.assertFalse(self.status()["rounds"][1].get("stalled"))
+
+    def test_the_next_round_waits_for_the_judge(self):
+        self.start()
+        self.audit(1, 8, findings=[self.finding("A1")])
+        code, out = self.audit(2, 9.2, prior=[{"id": "A1", "closed": True}])
+        self.assertNotEqual(code, 0)
+        self.assertIn("судья", out)
+
+    def test_the_judge_answers_every_serious_finding_and_adds_none(self):
+        self.start()
+        self.audit(1, 8, findings=[self.finding("A1"), self.finding("A2"), self.finding("A3", "minor")])
+        code, out = self.judge(1, A1="real")
+        self.assertNotEqual(code, 0)
+        self.assertIn("A2", out)
+        code, out = self.judge(1, A1="real", A2="real", A3="real")
+        self.assertNotEqual(code, 0)
+        self.assertIn("A3", out)
+        self.assertFalse(self.status()["rounds"][0].get("judged"))
+
+    def test_a_dismissed_finding_goes_to_no_repair_and_no_next_round(self):
+        self.start()
+        self.audit(1, 8, findings=[self.finding("A1"), self.finding("A2")])
+        code, out = self.judge(1, A1="real", A2="preference")
+        self.assertIn("в ремонт: A1\n", out)
+        code, out = self.audit(2, 8.5, prior=[{"id": "A1", "closed": True}])
+        self.assertEqual(code, 0, out)
+
+    def test_the_judge_clearing_the_blocking_finding_can_reach_the_threshold(self):
+        self.start()
+        low = {"data": {"score": 7, "evidence": "§4", "gap": "нет миграций"}}
+        self.audit(1, 9.6, criteria=low, findings=[self.finding("A1", "blocking")])
+        self.assertFalse(self.status()["rounds"][0]["passed"])
+        code, out = self.judge(1, A1="refuted")
+        self.assertEqual(code, 0, out)
+        self.assertIn("порог взят", out)
+        self.assertTrue(self.status()["rounds"][0]["passed"])
+
+    def test_a_blocking_finding_left_standing_holds_the_floor(self):
+        self.start()
+        low = {"data": {"score": 7, "evidence": "§4", "gap": "нет миграций"}}
+        self.audit(1, 9.6, criteria=low, findings=[self.finding("A1", "blocking")])
+        code, out = self.judge(1, A1="risk")
+        self.assertFalse(self.status()["rounds"][0]["passed"])
+        self.assertEqual(self.status()["rounds"][0]["floor"], 7)
+
+    def test_the_judge_does_not_remove_the_owners_question(self):
+        self.start()
+        self.audit(1, 8, findings=[self.finding("A1", owner=True)])
+        code, out = self.judge(1, A1="preference")
+        self.assertNotEqual(code, 0)
+        self.assertIn("вопрос владельца", out)
+
     def test_a_low_score_asks_for_another_round(self):
         self.start()
         code, out = self.audit(1, 7.5)
@@ -1133,6 +1252,7 @@ class Architecture(Base):
         self.start()
         finding = {"id": "A1", "severity": "major", "criterion": "data", "what": "нет миграций", "fix": "описать"}
         self.audit(1, 8, findings=[finding])
+        self.judge(1, A1="real")
         code, out = self.audit(2, 9.2)
         self.assertNotEqual(code, 0)
         self.assertIn("A1", out)
@@ -1144,6 +1264,7 @@ class Architecture(Base):
         finding = {"id": "A1", "severity": "blocking", "criterion": "data", "what": "нет миграций", "fix": "описать"}
         low = {"data": {"score": 6, "evidence": "§4", "gap": "нет"}}
         self.audit(1, 9, criteria=low, findings=[finding])
+        self.judge(1, A1="real")
         self.audit(2, 9.4, prior=[{"id": "A1", "closed": False}])
         self.assertFalse(self.status()["rounds"][1]["passed"])
 
