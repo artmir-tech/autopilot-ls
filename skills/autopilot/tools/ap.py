@@ -50,6 +50,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 for _s in (sys.stdout, sys.stderr):                       # cp1251-консоль Windows
@@ -77,7 +78,7 @@ WAIT_KINDS = ("briefing", "spec", "plan", "action", "stop")
 # Команды, которые значат «работа пошла дальше»: ожидание пользователя ими закрывается,
 # даже если `answered` забыли.
 MOVES_ON = {"stage", "ticket", "tickets", "check-plan", "coverage", "blind", "tests", "finish", "reopen"}
-ORDER = ["preflight", "manifest", "briefing", "spec", "plan", "build", "review", "final"]
+ORDER = ["preflight", "manifest", "briefing", "scout", "architecture", "spec", "plan", "build", "review", "final"]
 # Этап, чей результат лежит на диске, пройден — даже если его забыли отметить.
 ARTIFACT = {"manifest": "manifest.md", "spec": "spec.md", "plan": "tickets/*.md"}
 TICKET_STATUSES = {"start": "in-progress", "review": "review", "repair": "repair",
@@ -334,6 +335,7 @@ def parse_ticket(path):
         "type": get("тип", "type").lower() or None,
         "effort": get("усилие", "effort").lower() or None,
         "attention": get("внимание", "attention").lower() or None,
+        "architecture": get("архитектура", "architecture") or None,
         "night_ok": yes_no(get("ночью", "night")),
     }
 
@@ -408,7 +410,8 @@ def ls_night_row_problems(state, tickets):
 
 def ls_plan_problems(state, tickets):
     return ([p for t in tickets for p in ls_field_problems(t) + ls_zone_problems(t)]
-            + ls_wave_problems(tickets) + ls_night_row_problems(state, tickets))
+            + ls_wave_problems(tickets) + ls_night_row_problems(state, tickets)
+            + ls_arch_ticket_problems(tickets))
 
 
 # ── форк autopilot-ls: ночная очередь (phases/5-night.md) ──────────────────
@@ -736,6 +739,559 @@ def cmd_program(pos, opt):
         "программа сдана" if rows and all(r["status"] == "landed" for r in rows) else "следующего нет")
     flying = [r["id"] for r in rows if r["status"] == "in-flight"]
     return [head] + (["в работе: " + ", ".join(flying)] if flying else []) + out
+
+
+# ── форк autopilot-ls: поиск готового (phases/2a-scout.md) ──────────────────
+
+PRIOR_ART = os.path.join(A, "prior-art.json")
+SCOUT_DECISIONS = ("adopt", "adapt", "fork", "learn", "build")
+# Что можно подключить зависимостью и что можно копировать в свой код. Всё остальное — только изучать.
+LICENSE_COPY = {"MIT", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "ISC", "0BSD", "Unlicense", "Zlib"}
+LICENSE_DEP = LICENSE_COPY | {"MPL-2.0", "LGPL-2.1", "LGPL-3.0", "PSF-2.0", "Python-2.0"}
+SCOUT_STALE_DAYS = 540
+
+
+def scout_read():
+    try:
+        with open(PRIOR_ART, encoding="utf-8") as f:
+            return json.load(f)
+    except OSError:
+        return None
+    except ValueError as e:
+        die("prior-art.json не разбирается: %s" % e)
+
+
+def scout_write(data):
+    tmp = PRIOR_ART + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, PRIOR_ART)
+
+
+def fetch_json(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "autopilot-ls", "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def repo_json(repo):
+    try:
+        r = subprocess.run(["gh", "api", "repos/" + repo], capture_output=True, text=True, timeout=30)
+        if r.returncode == 0:
+            return json.loads(r.stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    try:
+        return fetch_json("https://api.github.com/repos/" + repo)
+    except (OSError, ValueError):
+        return None
+
+
+def repo_facts(repo):
+    """Лицензия, живость и сам факт существования — из GitHub, а не из памяти модели."""
+    data = repo_json(repo)
+    if not isinstance(data, dict) or "full_name" not in data:
+        return None
+    return {"license": (data.get("license") or {}).get("spdx_id") or "none",
+            "stars": data.get("stargazers_count"), "pushedAt": (data.get("pushed_at") or "")[:10],
+            "archived": bool(data.get("archived")), "checkedAt": now()[:10]}
+
+
+def package_exists(ref):
+    """pypi:aiogram · npm:grammy. True / False / None (реестр не ответил или экосистема не из этих двух)."""
+    eco, _, name = ref.partition(":")
+    template = {"pypi": "https://pypi.org/pypi/%s/json", "npm": "https://registry.npmjs.org/%s"}.get(eco)
+    if not template or not name:
+        return None
+    try:
+        fetch_json(template % urllib.parse.quote(name, safe="@/"))
+        return True
+    except urllib.error.HTTPError as e:
+        return False if e.code == 404 else None
+    except (OSError, ValueError):
+        return None
+
+
+def scout_candidates(data):
+    for p in data.get("products") or []:
+        yield p
+    for c in data.get("capabilities") or []:
+        for x in c.get("candidates") or []:
+            yield x
+
+
+def cmd_scout_verify(data):
+    out = []
+    for x in scout_candidates(data):
+        if not text_of(x.get("repo")):
+            out.append("! кандидат без поля repo: %s" % (x.get("what") or x))
+            continue
+        facts = repo_facts(x["repo"])
+        if facts is None:
+            x.pop("facts", None)
+            out.append("! %s: GitHub такого репозитория не знает — убери кандидата" % x["repo"])
+            continue
+        if text_of(x.get("package")):
+            facts["package"] = package_exists(x["package"])
+            if facts["package"] is False:
+                out.append("! %s: в реестре нет пакета %s — убери его" % (x["repo"], x["package"]))
+        x["facts"] = facts
+    data.pop("checked", None)
+    scout_write(data)
+    n = sum(1 for x in scout_candidates(data) if x.get("facts"))
+    return out + ["проверено кандидатов: %d" % n]
+
+
+def scout_candidate_problems(label, decision, x):
+    facts = x.get("facts")
+    if not facts:
+        return ["%s: %s не проверен — scout verify" % (label, x.get("repo"))]
+    out = []
+    if facts.get("archived") and decision != "learn":
+        out.append("%s: %s в архиве — брать нельзя, можно только изучать" % (label, x["repo"]))
+    if facts.get("package") is False:
+        out.append("%s: у %s нет такого пакета в реестре" % (label, x["repo"]))
+    allowed = LICENSE_DEP if decision == "adopt" else LICENSE_COPY if decision in ("adapt", "fork") else None
+    if allowed is not None and facts.get("license") not in allowed:
+        out.append("%s: лицензия %s не разрешает «%s» — только изучать" % (label, facts.get("license"), decision))
+    return out
+
+
+def scout_capability_problems(c):
+    label = c.get("id") or c.get("name") or "?"
+    decision = c.get("decision")
+    out = []
+    if decision not in SCOUT_DECISIONS:
+        return ["%s: решение — %s" % (label, " | ".join(SCOUT_DECISIONS))]
+    if not text_of(c.get("why")):
+        out.append("%s: решение без причины" % label)
+    if not c.get("requirements"):
+        out.append("%s: не названы требования, которые оно закрывает" % label)
+    if not isinstance(c.get("core"), bool):
+        out.append("%s: не сказано, отличает ли это продукт (core: true/false)" % label)
+    if decision == "build":
+        if not c.get("candidates") and not text_of(c.get("searched")):
+            out.append("%s: пишем сами, а что искали — не сказано (searched)" % label)
+        return out
+    chosen = next((x for x in c.get("candidates") or [] if x.get("repo") == c.get("choice")), None)
+    if chosen is None:
+        return out + ["%s: выбран %s, но его нет среди кандидатов" % (label, c.get("choice"))]
+    out += scout_candidate_problems(label, decision, chosen)
+    if c.get("core") and decision in ("adopt", "fork") and not text_of(c.get("byUser")):
+        out.append("%s отличает продукт: брать готовым можно только словами владельца (byUser)" % label)
+    if decision == "fork" and not text_of(c.get("byUser")):
+        out.append("%s: чужой проект за основу — решение владельца (byUser)" % label)
+    if decision in ("adapt", "fork") and not (c.get("spike") or {}).get("result"):
+        out.append("%s: перед «%s» нужна проба (spike.result)" % (label, decision))
+    return out
+
+
+def scout_problems(data):
+    caps = data.get("capabilities")
+    if not isinstance(caps, list) or not caps:
+        return ["нет списка capabilities"]
+    out = []
+    for c in caps:
+        out += scout_capability_problems(c)
+    return out
+
+
+def scout_stale(data, today=None):
+    """Давно не обновлялось — не отказ: у зрелой маленькой библиотеки это норма, но сказать надо."""
+    today = today or dt.date.fromisoformat(now()[:10])
+    out = []
+    for c in data.get("capabilities") or []:
+        chosen = next((x for x in c.get("candidates") or [] if x.get("repo") == c.get("choice")), {})
+        pushed = (chosen.get("facts") or {}).get("pushedAt")
+        if pushed and (today - dt.date.fromisoformat(pushed)).days > SCOUT_STALE_DAYS and c.get("decision") != "learn":
+            out.append("%s: %s не обновлялся с %s — проверь, зрелость это или заброшенность" % (c.get("id"), chosen["repo"], pushed))
+    return out
+
+
+def mirror_gate(gate, ok, **kw):
+    """Идёт прогон — проектный гейт виден на его дашборде."""
+    state = read_state()
+    if state is None or state.get("finishedAt"):
+        return
+    state["updatedAt"] = now()
+    beat(state)
+    set_gate(state, gate, ok, **kw)
+    save(state)
+    write_snapshot(state)
+
+
+def scout_counts(data):
+    caps = data.get("capabilities") or []
+    taken = [c for c in caps if c.get("decision") in ("adopt", "adapt", "fork")]
+    return {"capabilities": len(caps), "taken": len(taken), "own": len(caps) - len(taken)}
+
+
+def cmd_scout(pos, opt):
+    act = pos[0] if pos else "status"
+    data = scout_read()
+    if data is None:
+        die("нет .autopilot/prior-art.json — его пишет разведчик (prompts/scout.md)")
+    if act == "verify":
+        return cmd_scout_verify(data)
+    if act == "check":
+        problems = scout_problems(data)
+        counts = scout_counts(data)
+        data["checked"] = {"ok": not problems, "at": now()}
+        scout_write(data)
+        mirror_gate("GS", not problems, problems=len(problems), **counts)
+        if problems:
+            return ["! " + p for p in problems]
+        return ["GS пройден: частей %(capabilities)d, берём готовым %(taken)d, пишем сами %(own)d" % counts] \
+            + ["! " + p for p in scout_stale(data)]
+    if act == "status":
+        return ["частей %(capabilities)d, берём готовым %(taken)d, пишем сами %(own)d" % scout_counts(data),
+                "проверка: " + ("пройдена" if (data.get("checked") or {}).get("ok") else "не пройдена")]
+    die("scout verify | check | status")
+
+
+def scout_passed():
+    return bool(((scout_read() or {}).get("checked") or {}).get("ok"))
+
+
+def ls_scout_guard(state):
+    """Архитектор проектирует, зная, что уже есть готовым, — или записано, почему искать незачем."""
+    s = next((x for x in state.get("stages") or [] if x.get("id") == "scout"), None)
+    if s is None or s.get("status") == "skipped" or scout_passed():
+        return
+    die("поиск готового не закончен: `scout check`. Искать незачем — `stage scout skip --note \"почему\"`")
+
+
+# ── форк autopilot-ls: архитектура и её аудит (phases/2b-architecture.md) ───
+
+ARCH_DOC = os.path.join(A, "architecture.md")
+ARCH_AUDITS = os.path.join(A, "architecture-audit")
+ARCH_STATE = os.path.join(ARCH_AUDITS, "state.json")
+# Рубрика — standards/architecture-rubric.md: ключ, вес, слова для владельца, можно ли «не применимо».
+ARCH_CRITERIA = (
+    ("product_fit", 3, "Соответствие продукту", False),
+    ("qualities", 2, "Главные качества и их цифры", False),
+    ("boundaries", 2, "Границы частей и зависимости", False),
+    ("domain", 2, "Ядро и источник истины", True),
+    ("data", 2, "Данные и их изменение", True),
+    ("flows", 2, "Потоки и одновременность", True),
+    ("failure", 2, "Отказы и внешние сервисы", False),
+    ("security", 2, "Безопасность и личные данные", False),
+    ("ops", 1, "Эксплуатация и наблюдаемость", True),
+    ("testability", 2, "Проверяемость", False),
+    ("performance", 1, "Нагрузка и стоимость", True),
+    ("evolution", 1, "Развитие продукта", True),
+    ("simplicity", 2, "Простота и соразмерность", False),
+    ("delivery", 2, "Сборка по частям", False),
+    ("decisions", 1, "Записанные решения", False),
+    ("reuse", 2, "Готовое и своё", True),
+    ("llm", 2, "Слой языковых моделей", True),
+    ("legacy", 1, "Наследие и уроки прошлого", True),
+)
+ARCH_PASS = 9.0          # общий балл, который надо набрать
+ARCH_FLOOR = 8           # ниже этого не может быть ни один критерий: среднее не прячет дыру
+ARCH_MAX_ROUNDS = 6      # кругов аудита и подтверждения на архитектуру
+ARCH_DELTA_ROUNDS = 3    # кругов на одно изменение принятой архитектуры
+ARCH_MIN_SCENARIOS = 5
+ARCH_SEVERITIES = ("blocking", "major", "minor")
+ARCH_KINDS = ("audit", "confirm", "delta", "as-built")
+
+
+def arch_read():
+    try:
+        with open(ARCH_STATE, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def arch_write(a):
+    os.makedirs(ARCH_AUDITS, exist_ok=True)
+    tmp = ARCH_STATE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(a, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, ARCH_STATE)
+
+
+def arch_accepted():
+    return bool(((arch_read() or {}).get("gate") or {}).get("ok"))
+
+
+def text_of(v):
+    return v.strip() if isinstance(v, str) else ""
+
+
+def arch_criteria_problems(crit):
+    out = []
+    for key, _, name, may_na in ARCH_CRITERIA:
+        c = crit.get(key)
+        if not isinstance(c, dict):
+            out.append("нет оценки по критерию %s (%s)" % (key, name))
+        elif "na" in c:
+            if not may_na:
+                out.append("%s (%s) нельзя пропустить как «не применимо»" % (key, name))
+            elif not text_of(c["na"]):
+                out.append("%s: «не применимо» без причины" % key)
+        elif isinstance(c.get("score"), bool) or not isinstance(c.get("score"), (int, float)) \
+                or not 0 <= c["score"] <= 10:
+            out.append("%s: оценка должна быть числом от 0 до 10" % key)
+        else:
+            if not text_of(c.get("evidence")):
+                out.append("%s: оценка без доказательства из документа" % key)
+            if c["score"] < ARCH_PASS and not text_of(c.get("gap")):
+                out.append("%s: %s — не сказано, чего не хватает до 9" % (key, c["score"]))
+    return out
+
+
+def arch_finding_problems(findings, crit):
+    out, known = [], {k for k, _, _, _ in ARCH_CRITERIA}
+    for f in findings:
+        label = f.get("id") or "находка без id"
+        for field in ("id", "what", "fix"):
+            if not text_of(f.get(field)):
+                out.append("%s: пустое поле %s" % (label, field))
+        if f.get("severity") not in ARCH_SEVERITIES:
+            out.append("%s: важность — blocking, major или minor" % label)
+        if f.get("criterion") not in known:
+            out.append("%s: неизвестный критерий %s" % (label, f.get("criterion")))
+        elif f.get("severity") == "blocking" and (crit.get(f["criterion"]) or {}).get("score", 0) > 7:
+            out.append("%s блокирует сборку, а критерий %s оценён выше 7" % (label, f["criterion"]))
+    return out
+
+
+def arch_audit_problems(audit, expected_prior):
+    """Файл аудита принимается целиком или не принимается: балл считает ap.py, и только по полному файлу."""
+    if not isinstance(audit, dict) or not isinstance(audit.get("criteria"), dict):
+        return ["в файле нет раздела criteria"]
+    out = arch_criteria_problems(audit["criteria"])
+    findings = audit.get("findings")
+    if not isinstance(findings, list):
+        return out + ["нет списка findings (пустой список — тоже список)"]
+    out += arch_finding_problems(findings, audit["criteria"])
+    scenarios = audit.get("scenarios") or []
+    if len(scenarios) < ARCH_MIN_SCENARIOS:
+        out.append("сценариев %d, нужно хотя бы %d" % (len(scenarios), ARCH_MIN_SCENARIOS))
+    for s in scenarios:
+        if not text_of(s.get("name")) or s.get("verdict") not in ("проходит", "ломается"):
+            out.append("сценарий без имени или без вердикта «проходит»/«ломается»: %s" % s.get("name"))
+    seen = {p.get("id") for p in audit.get("prior") or []}
+    missing = [i for i in expected_prior if i not in seen]
+    if missing:
+        out.append("не сказано, закрыты ли прошлые находки: " + ", ".join(missing))
+    if not text_of(audit.get("summary")):
+        out.append("нет summary — итога простыми словами")
+    return out
+
+
+def arch_score(audit):
+    """Общий балл — взвешенное среднее по применимым критериям; минимум и всё, что ниже порога."""
+    total = weight = 0
+    scored = []
+    for key, w, _, _ in ARCH_CRITERIA:
+        c = audit["criteria"][key]
+        if "na" not in c:
+            total += w * c["score"]
+            weight += w
+            scored.append((key, c["score"]))
+    below = ["%s %s" % pair for pair in scored if pair[1] < ARCH_FLOOR]
+    return round(total / weight, 2), min(s for _, s in scored), below
+
+
+def arch_used(a, kinds):
+    return sum(1 for r in a.get("rounds") or [] if r.get("kind") in kinds)
+
+
+def arch_expected_prior(a, kind):
+    """Прошлые находки сверяет только обычный круг: подтверждающий критик их не видит — он слепой."""
+    if kind not in ("audit", "delta"):
+        return []
+    rounds = [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"]
+    if not rounds or rounds[-1].get("passed"):
+        return []
+    return rounds[-1].get("blocking", []) + rounds[-1].get("major", [])
+
+
+def arch_record(a, kind, rel, audit):
+    overall, floor, below = arch_score(audit)
+    findings = audit["findings"]
+    earlier = [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"][-1:]
+    was_blocking = set(earlier[0].get("blocking", [])) if earlier else set()
+    unclosed = [p["id"] for p in audit.get("prior") or [] if not p.get("closed") and p.get("id") in was_blocking]
+    broken = [s["name"] for s in audit.get("scenarios") or [] if s.get("verdict") == "ломается"]
+    blocking = [f["id"] for f in findings if f["severity"] == "blocking"]
+    return {"n": len(a.get("rounds") or []) + 1, "kind": kind, "at": now(), "file": rel,
+            "overall": overall, "floor": floor, "below": below, "blocking": blocking,
+            "major": [f["id"] for f in findings if f["severity"] == "major"],
+            "unclosed": unclosed, "broken": broken, "summary": audit["summary"],
+            "owner": [f["id"] for f in findings if f.get("owner")],
+            "passed": overall >= ARCH_PASS and floor >= ARCH_FLOOR
+            and not blocking and not unclosed and not broken}
+
+
+def arch_line(r):
+    tail = []
+    if r["below"]:
+        tail.append("ниже %d: %s" % (ARCH_FLOOR, ", ".join(r["below"])))
+    if r["blocking"]:
+        tail.append("блокирующих находок: %d" % len(r["blocking"]))
+    if r["unclosed"]:
+        tail.append("не закрыто с прошлого круга: " + ", ".join(r["unclosed"]))
+    if r["broken"]:
+        tail.append("ломаются сценарии: " + "; ".join(r["broken"]))
+    return "круг %d (%s): %s из 10, минимум %s%s" % (
+        r["n"], r["kind"], r["overall"], r["floor"], " · " + " · ".join(tail) if tail else "")
+
+
+def arch_set_gate(a, rec, ok):
+    a["gate"] = {"ok": ok, "score": rec["overall"], "floor": rec["floor"], "at": rec["at"], "round": rec["n"]}
+
+
+def arch_gate_step(a, rec):
+    """Что круг значит для гейта и что делать дальше. Подтверждает только второй, независимый критик."""
+    kind, passed = rec["kind"], rec["passed"]
+    if kind == "as-built":
+        return "сверка с кодом записана, на принятие архитектуры не влияет"
+    if kind == "confirm" and passed:
+        arch_set_gate(a, rec, True)
+        return "GA пройден: %s из 10, подтверждено независимым критиком" % rec["overall"]
+    if kind == "delta" and passed:
+        arch_set_gate(a, rec, True)
+        a.pop("delta", None)
+        return "GA пройден: изменение принято, %s из 10" % rec["overall"]
+    arch_set_gate(a, rec, False)
+    if kind == "audit" and passed:
+        return "порог взят — теперь подтверждение: новый критик вслепую, `arch round --kind confirm`"
+    if arch_used(a, ("delta",)) - a.get("deltaBase", 0) >= ARCH_DELTA_ROUNDS and kind == "delta":
+        return "! потолок кругов на изменение (%d): вопрос владельцу — `ask stop`, затем `arch waive --by-user`" % ARCH_DELTA_ROUNDS
+    if arch_used(a, ("audit", "confirm")) >= ARCH_MAX_ROUNDS:
+        return "! потолок кругов (%d): вопрос владельцу — `ask stop`, затем `arch waive --by-user`" % ARCH_MAX_ROUNDS
+    return "ещё круг: архитектор чинит находки, потом новый критик"
+
+
+def arch_round(a, opt):
+    kind = opt.get("kind") if isinstance(opt.get("kind"), str) else "audit"
+    if kind not in ARCH_KINDS:
+        die("arch round --kind audit|confirm|delta|as-built")
+    if not isinstance(opt.get("file"), str):
+        die("arch round --file .autopilot/architecture-audit/NN.json — файл критика")
+    if kind != "as-built":
+        arch_round_allowed(a, kind)
+    path = opt["file"] if os.path.isabs(opt["file"]) else os.path.join(ROOT, opt["file"])
+    try:
+        with open(path, encoding="utf-8") as f:
+            audit = json.load(f)
+    except OSError:
+        die("нет файла %s" % opt["file"])
+    except ValueError as e:
+        die("файл аудита — не JSON: %s" % e)
+    problems = arch_audit_problems(audit, arch_expected_prior(a, kind))
+    if problems:
+        die("аудит не принят — верни его критику:\n  ! " + "\n  ! ".join(problems))
+    rec = arch_record(a, kind, os.path.relpath(path, ROOT), audit)
+    a.setdefault("rounds", []).append(rec)
+    step = arch_gate_step(a, rec)
+    arch_write(a)
+    arch_mirror(a)
+    return [arch_line(rec), step]
+
+
+def arch_round_allowed(a, kind):
+    if a.get("delta") and kind != "delta":
+        die("идёт изменение архитектуры — круг только --kind delta")
+    if kind == "delta":
+        if not a.get("delta"):
+            die("изменения нет — сначала arch delta --note \"что меняется\"")
+        if arch_used(a, ("delta",)) - a.get("deltaBase", 0) >= ARCH_DELTA_ROUNDS:
+            die("потолок кругов на изменение — вопрос владельцу: ask stop, затем arch waive --by-user")
+        return
+    if (a.get("gate") or {}).get("ok"):
+        die("архитектура уже принята; изменить её — arch delta --note \"что меняется\"")
+    if arch_used(a, ("audit", "confirm")) >= ARCH_MAX_ROUNDS:
+        die("потолок кругов (%d): вопрос владельцу — ask stop, затем arch waive --by-user \"«…»\"" % ARCH_MAX_ROUNDS)
+    last = [r for r in a.get("rounds") or [] if r.get("kind") != "as-built"][-1:]
+    if kind == "confirm" and not (last and last[0].get("passed") and last[0].get("kind") == "audit"):
+        die("подтверждать нечего: сначала обычный круг, набравший порог")
+
+
+def arch_mirror(a):
+    """Идёт прогон — принятие архитектуры видно на его дашборде как гейт GA."""
+    state = read_state()
+    if state is None or state.get("finishedAt") or not a.get("rounds"):
+        return
+    state["updatedAt"] = now()
+    beat(state)
+    g = a.get("gate") or {}
+    set_gate(state, "GA", bool(g.get("ok")), score=g.get("score"), floor=g.get("floor"),
+             rounds=len(a["rounds"]), waived=g.get("waived"))
+    save(state)
+    write_snapshot(state)
+
+
+def arch_status(a):
+    g = a.get("gate") or {}
+    head = "архитектура принята: %s из 10%s" % (g.get("score"), " (с оговоркой владельца)" if g.get("waived") else "") \
+        if g.get("ok") else "архитектура ещё не принята"
+    return [head] + [arch_line(r) for r in a.get("rounds") or []]
+
+
+def cmd_arch(pos, opt):
+    act = pos[0] if pos else "status"
+    a = arch_read()
+    if act == "start":
+        scope = opt.get("scope") if opt.get("scope") in ("project", "run") else "run"
+        if a is not None:
+            return ["аудит уже начат — " + arch_status(a)[0]]
+        arch_write({"scope": scope, "startedAt": now(), "rounds": [], "gate": {"ok": False}})
+        return ["архитектура: документ `.autopilot/architecture.md`, аудиты `.autopilot/architecture-audit/`"]
+    if a is None:
+        die("аудита ещё не было — arch start")
+    if act == "round":
+        return arch_round(a, opt)
+    if act == "status":
+        return arch_status(a)
+    if act == "waive":
+        if not isinstance(opt.get("by-user"), str):
+            die("arch waive --by-user \"«слова владельца»\" — ниже порога только его словами")
+        if not a.get("rounds"):
+            die("принимать нечего: ни одного круга аудита")
+        a["gate"] = {"ok": True, "waived": opt["by-user"], "score": a["rounds"][-1]["overall"],
+                     "floor": a["rounds"][-1]["floor"], "at": now(), "round": a["rounds"][-1]["n"]}
+        a.pop("delta", None)
+        arch_write(a)
+        arch_mirror(a)
+        return ["архитектура принята словами владельца при оценке %s" % a["gate"]["score"]]
+    if act == "delta":
+        if not isinstance(opt.get("note"), str):
+            die("arch delta --note \"что меняется и почему\"")
+        a["delta"] = {"note": opt["note"], "at": now()}
+        a["deltaBase"] = arch_used(a, ("delta",))
+        a["gate"]["ok"] = False
+        arch_write(a)
+        arch_mirror(a)
+        return ["изменение архитектуры открыто: архитектор правит документ, потом `arch round --kind delta`"]
+    die("arch start | round | status | waive | delta")
+
+
+def ls_arch_guard(state):
+    """Спецификация пишется поверх принятой архитектуры — или с записанной причиной, почему её нет."""
+    s = next((x for x in state.get("stages") or [] if x.get("id") == "architecture"), None)
+    if s is None or s.get("status") == "skipped" or arch_accepted():
+        return
+    die("архитектура не принята: `arch status`. Маленькая сборка — `stage architecture skip --note \"почему не нужна\"`")
+
+
+def ls_arch_ticket_problems(tickets):
+    """Принятая архитектура — договор: таск называет разделы, которые строит."""
+    if not arch_accepted():
+        return []
+    return ["у таска %s нет поля Архитектура" % t["id"]
+            for t in tickets if t.get("type") != "prompt" and not t.get("architecture")]
+
+
+def ls_arch_landing(state):
+    s = next((x for x in state.get("stages") or [] if x.get("id") == "architecture"), None)
+    if s is None or s.get("status") == "skipped" or arch_accepted():
+        return []
+    return ["GA: архитектура не принята"]
 
 
 # ── форк autopilot-ls: обзор владельцем (phases/5-prompts.md, «The owner's look») ──
@@ -1370,7 +1926,14 @@ def cmd_stage(state, pos, opt):
     if isinstance(opt.get("note"), str):
         s["note"] = opt["note"]
     if sid == "spec" and action in ("start", "done"):
+        ls_arch_guard(state)
         refresh_g1(state, create=True)
+    if sid == "architecture" and action in ("start", "done"):
+        ls_scout_guard(state)
+    if sid == "scout" and action == "done" and not scout_passed():
+        die("поиск готового не проверен: `scout verify`, потом `scout check`")
+    if sid == "architecture" and action == "done" and not arch_accepted():
+        die("архитектура не принята: `arch status`")
     log(state, "stage", id=sid, act=action,
         note=opt["note"] if action in ("skip", "fail") and isinstance(opt.get("note"), str) else None)
 
@@ -1580,6 +2143,7 @@ def landing_problems(state):
         elif not tk.get("commit"):
             refuse.append("таск %s: сдан без коммита" % tk["id"])
     refuse += ["таск %s: коммита %s нет в истории" % pair for pair in lost_commits(state)]
+    refuse += ls_arch_landing(state)
     return refuse, caveat
 
 
@@ -1667,6 +2231,9 @@ def cmd_commits(state):
              for i, c in lost_commits(state)] or ["коммиты сданных тасков на месте"])
 
 
+PROJECT_COMMANDS = {"program": cmd_program, "arch": cmd_arch, "scout": cmd_scout}
+
+
 def main():
     argv = sys.argv[1:]
     # Справка ничего не трогает: ни state.js, ни гейты, ни сервер.
@@ -1679,8 +2246,8 @@ def main():
     pos, opt, multi = parse_args(argv)
     cmd = pos[0] if pos else ""
     notes = []
-    if cmd == "program":                 # программа живёт между прогонами: state.js ей не нужен
-        for line in cmd_program(pos[1:], opt):
+    if cmd in PROJECT_COMMANDS:          # проект живёт между прогонами: state.js этим командам не нужен
+        for line in PROJECT_COMMANDS[cmd](pos[1:], opt):
             print("  " + (line if line.startswith("!") else "· " + line))
         return
     if cmd == "init":

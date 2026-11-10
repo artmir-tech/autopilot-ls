@@ -45,7 +45,7 @@ Autopilot's file → one line appended between the markers. The user's → one l
 | Окружение | variable names and what each is for — **never values** |
 | Как здесь работает Autopilot | from the skeleton, unchanged |
 
-**At tier T2+ the architecture goes to `docs/architecture.md`** — data flow, module boundaries, the conventions this project settled, folded from `interfaces.md` minus its per-ticket framing — with one pointer line to it from the memory file. The memory file stays short; the reasoning for decisions is Moment 4's.
+**At tier T2+ the architecture goes to `docs/architecture.md`** — data flow, module boundaries, the conventions this project settled, folded from `interfaces.md` minus its per-ticket framing — with one pointer line to it from the memory file. When `.autopilot/architecture.md` exists it is the design and this file describes what was actually built, with a link to it. The memory file stays short; the reasoning for decisions is Moment 4's.
 
 Its brief:
 

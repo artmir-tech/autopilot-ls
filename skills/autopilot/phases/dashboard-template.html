@@ -110,7 +110,7 @@
   .big>span{display:block;font-size:14px;color:var(--h-mut);margin-top:10px}
   .big .paused{display:block;margin-top:6px;font-weight:650;color:var(--h-tx)}
   .hint{display:inline-flex;align-items:center;gap:10px;margin-top:18px;min-height:44px;padding:8px 18px;border-radius:22px;background:#1A0D06;color:#fff;font-size:15px;font-weight:600;line-height:1.35}
-  .track{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}
+  .track{display:grid;grid-template-columns:repeat(var(--stages,10),minmax(0,1fr));gap:5px}
   .seg{height:12px;border-radius:4px;background:var(--h-track);overflow:hidden}
   .seg i{display:block;height:100%;border-radius:4px}
   .s-done .seg i{width:100%;background:#21A35B}
@@ -346,7 +346,7 @@
 
 <script>
 // Полный цикл сборки. state.js может прислать меньше — недостающие показываем как pending.
-const STAGE_IDS = ['preflight','manifest','briefing','spec','plan','build','review','final'];
+const STAGE_IDS = ['preflight','manifest','briefing','scout','architecture','spec','plan','build','review','final'];
 const POLL_MS = 10000;
 const IDLE_CAP_MS = 2700000;
 
@@ -401,21 +401,23 @@ const q = (s, lang) => lang === 'en' ? `“${s}”` : `«${s}»`;
 
 const I18N = {
   ru:{lang:"ru",of:"из",
-    stages:{preflight:"Подготовка",manifest:"Требования",briefing:"Брифинг",spec:"Спецификация",
+    stages:{preflight:"Подготовка",manifest:"Требования",briefing:"Брифинг",scout:"Поиск готового",architecture:"Архитектура",spec:"Спецификация",
       plan:"План",build:"Разработка",review:"Код-ревью",final:"Приёмка"},
     modes:{full:"Полный автомат",semi:"Полуавтомат",interview:"Интервью",manual:"Ручной режим"},
     depths:{strict:"Строго по брифу",normal:"Обычная глубина",deep:"Максимальная глубина"},
     started:t=>`начата ${t}`,startedRange:(a,b)=>`${a} — ${b}`,today:"сегодня в",
     refresh:"Обновить сейчас",langLabel:"Язык",themeLabel:"Тема",themeLight:"Светлая тема",themeDark:"Тёмная тема",
     lost:"Связь с дашбордом пропала — на экране последнее, что он успел получить. Так бывает, когда компьютер засыпает. Скажи агенту «подними дашборд»: страница подхватит его сама, перезагружать не нужно.",
-    stateRun:{preflight:"Идёт подготовка",manifest:"Разбор требований",briefing:"Идёт брифинг",spec:"Пишется спецификация",
+    stateRun:{preflight:"Идёт подготовка",manifest:"Разбор требований",briefing:"Идёт брифинг",scout:"Ищу готовые решения",architecture:"Проектируется архитектура",spec:"Пишется спецификация",
       plan:"Составляется план",build:"Идёт разработка",review:"Идёт код-ревью",final:"Идёт приёмка"},
     h2Run:{preflight:"Готовлю репозиторий и дашборд",manifest:"Разбираю бриф на требования — слово в слово",
-      briefing:"Ищу в брифе то, что нельзя построить как написано",spec:"Пишу спецификацию по твоим словам",
+      briefing:"Ищу в брифе то, что нельзя построить как написано",scout:"Ищу на GitHub то, что уже решает твою задачу",architecture:"Проектирую архитектуру и отдаю её строгому критику",spec:"Пишу спецификацию по твоим словам",
       plan:"Режу спецификацию на таски",review:"Проверяю всю сборку целиком",final:"Проверяю результат вслепую — по брифу, без спецификации"},
     leadRun:{preflight:"Дальше бриф разрежется на требования, и ни одно не потеряется до конца сборки.",
       manifest:"Каждое требование хранит твои точные слова — по ним сборку проверят в конце.",
       briefing:"Если найдётся развилка, которую решать тебе, вопрос придёт в чат.",
+      scout:"Что возьмём готовым, а что напишем сами, решается по каждой части отдельно. Лицензии проверяются автоматически.",
+      architecture:"Независимый критик ставит оценку по списку требований. Дальше идём, только когда будет хотя бы 9 из 10.",
       spec:"Потом независимый читатель сверит спецификацию с брифом — без моих пересказов.",
       plan:"Каждое требование попадёт в таск, и каждый таск — от требования.",
       review:"Одно ревью всей ветки с проверкой безопасности. Всё, что стоит поправить, исправит один таск.",
@@ -460,8 +462,8 @@ const I18N = {
     rs:{done:"сделано",work:"в работе",open:"разбирается",placeholder:"нужны твои данные",deferred:"отложено",dropped:"снято тобой"},
     fAll:"Все",fDone:"Сделано",fWork:"В работе",fOpen:"Разбирается",fPh:"Нужны твои данные",fDef:"Отложено",fDrop:"Снято",
     showAll:n=>`Показать все ${n}`,collapse:"Свернуть",more:n=>`Ещё ${n}`,
-    gates:"Проверки",gatesOf:n=>`${n} из 4`,
-    gT:{G1:"Бриф разобран до конца",G2:"Спецификация ничего не потеряла",G3:"Каждое требование — в таске",G4:"Слепая приёмка"},
+    gates:"Проверки",gatesOf:(n,t)=>`${n} из ${t}`,
+    gT:{G1:"Бриф разобран до конца",G2:"Спецификация ничего не потеряла",G3:"Каждое требование — в таске",G4:"Слепая приёмка",GA:"Архитектура прошла аудит",GS:"Готовое проверено"},
     g1ok:n=>`0 открытых вопросов из ${n}`,g1bad:n=>`${n} ${plural(n,'вопрос','вопроса','вопросов')} ещё ${plural(n,'открыт','открыты','открыто')}`,
     g1ask:"Ждёт твоих ответов в чате",g1later:"Впереди: после брифинга",
     g2:(f,x,d)=>f ? `Независимый читатель нашёл ${f} ${plural(f,'пропуск','пропуска','пропусков')}: ${x} ${plural(x,'дописан','дописано','дописано')}, ${d} отложено` : "Независимый читатель пропусков не нашёл",
@@ -493,7 +495,9 @@ const I18N = {
       gate:{G1:(ok,e)=>ok ? "Бриф разобран до конца" : `Бриф: открытых вопросов — ${e.open}`,
         G2:(ok,e)=>`Спецификация сверена с брифом${e.found ? `: ${e.found} ${plural(e.found,'пропуск','пропуска','пропусков')}` : ' — пропусков нет'}`,
         G3:(ok,e)=>ok ? "План покрывает все требования" : `План не сходится: ${e.problems} ${plural(e.problems,'проблема','проблемы','проблем')}`,
-        G4:(ok,e)=>`Слепая приёмка: ${e.matched} из ${e.checked}`},
+        G4:(ok,e)=>`Слепая приёмка: ${e.matched} из ${e.checked}`,
+        GA:(ok,e)=>ok ? `Архитектура принята: ${e.score} из 10` : `Архитектура: ${e.score} из 10 — ещё круг`,
+        GS:(ok,e)=>ok ? `Частей ${e.capabilities}: берём готовым ${e.taken}, пишем сами ${e.own}` : `Поиск готового: проблем ${e.problems}`},
       add:{concerns:n=>`Ревью: +${n} ${plural(n,'замечание','замечания','замечаний')}`,report:n=>`В отчёт: +${n}`,
         'debt.placeholders':n=>`Заглушка в проекте: +${n}`,'debt.assumptions':n=>`Решение за тебя: +${n}`,
         'debt.emptyEnv':n=>`Ключ в .env: +${n}`,additions:n=>`Добавлено сверх брифа: +${n}`},
@@ -505,17 +509,17 @@ const I18N = {
     bootHelp:"Страница проверяет файл каждые десять секунд и покажет данные, как только он появится. Если сборка идёт давно, скажи агенту «обнови состояние». Саму сборку это не затрагивает.",
     tabWait:"● Ждём ответа"},
   en:{lang:"en",of:"of",
-    stages:{preflight:"Preflight",manifest:"Requirements",briefing:"Briefing",spec:"Spec",
+    stages:{preflight:"Preflight",manifest:"Requirements",briefing:"Briefing",scout:"Prior art",architecture:"Architecture",spec:"Spec",
       plan:"Plan",build:"Development",review:"Code review",final:"Acceptance"},
     modes:{full:"Fully automatic",semi:"Semi-automatic",interview:"Interview",manual:"Manual"},
     depths:{strict:"Strictly as written",normal:"Normal depth",deep:"Maximum depth"},
     started:t=>`started ${t}`,startedRange:(a,b)=>`${a} — ${b}`,today:"today at",
     refresh:"Refresh now",langLabel:"Language",themeLabel:"Theme",themeLight:"Light theme",themeDark:"Dark theme",
     lost:"The dashboard lost its connection — the screen shows the last state it received. This happens when the computer sleeps. Ask the agent to bring the dashboard back up: the page will pick it up by itself, no reload needed.",
-    stateRun:{preflight:"Preflight",manifest:"Reading the brief",briefing:"Briefing",spec:"Writing the spec",
+    stateRun:{preflight:"Preflight",manifest:"Reading the brief",briefing:"Briefing",scout:"Looking for what already exists",architecture:"Designing the architecture",spec:"Writing the spec",
       plan:"Planning",build:"Development",review:"Code review",final:"Acceptance"},
     h2Run:{preflight:"Setting up the repo and the dashboard",manifest:"Cutting the brief into requirements, word for word",
-      briefing:"Looking for what cannot be built as written",spec:"Writing the spec from your words",
+      briefing:"Looking for what cannot be built as written",scout:"Looking on GitHub for what already solves this",architecture:"Designing the architecture and handing it to a strict critic",spec:"Writing the spec from your words",
       plan:"Cutting the spec into tickets",review:"Reviewing the whole build",final:"Checking the result blind — against the brief, without the spec"},
     leadRun:{preflight:"Next, the brief becomes requirements, and none of them gets lost before the end.",
       manifest:"Every requirement keeps your exact words — the build is checked against them at the end.",
@@ -561,8 +565,8 @@ const I18N = {
     rs:{done:"done",work:"in progress",open:"being read",placeholder:"your data needed",deferred:"deferred",dropped:"dropped by you"},
     fAll:"All",fDone:"Done",fWork:"In progress",fOpen:"Being read",fPh:"Your data needed",fDef:"Deferred",fDrop:"Dropped",
     showAll:n=>`Show all ${n}`,collapse:"Collapse",more:n=>`${n} more`,
-    gates:"Checks",gatesOf:n=>`${n} of 4`,
-    gT:{G1:"The brief is fully read",G2:"The spec lost nothing",G3:"Every requirement is in a ticket",G4:"Blind acceptance"},
+    gates:"Checks",gatesOf:(n,t)=>`${n} of ${t}`,
+    gT:{G1:"The brief is fully read",G2:"The spec lost nothing",G3:"Every requirement is in a ticket",G4:"Blind acceptance",GA:"The architecture passed its audit",GS:"Prior art checked"},
     g1ok:n=>`0 open questions of ${n}`,g1bad:n=>`${n} ${en(n,'question','questions')} still open`,
     g1ask:"Waiting for your answers in the chat",g1later:"Ahead: after the briefing",
     g2:(f,x,d)=>f ? `An independent reader found ${f} ${en(f,'gap','gaps')}: ${x} written in, ${d} deferred` : "An independent reader found no gaps",
@@ -592,7 +596,9 @@ const I18N = {
       gate:{G1:(ok,e)=>ok ? "The brief is fully read" : `Brief: ${e.open} open questions`,
         G2:(ok,e)=>`Spec checked against the brief${e.found ? `: ${e.found} gaps` : ' — no gaps'}`,
         G3:(ok,e)=>ok ? "The plan covers every requirement" : `The plan does not add up: ${e.problems} problems`,
-        G4:(ok,e)=>`Blind acceptance: ${e.matched} of ${e.checked}`},
+        G4:(ok,e)=>`Blind acceptance: ${e.matched} of ${e.checked}`,
+        GA:(ok,e)=>ok ? `Architecture accepted: ${e.score} of 10` : `Architecture: ${e.score} of 10 — another round`,
+        GS:(ok,e)=>ok ? `${e.capabilities} parts: ${e.taken} taken ready-made, ${e.own} ours` : `Prior art: ${e.problems} problems`},
       add:{concerns:n=>`Review: +${n} notes`,report:n=>`For the report: +${n}`,'debt.placeholders':n=>`Placeholder: +${n}`,
         'debt.assumptions':n=>`Decision made for you: +${n}`,'debt.emptyEnv':n=>`Key for .env: +${n}`,additions:n=>`Added beyond the brief: +${n}`},
       tests:e=>`Full run: ${e.passed} tests${e.failed ? `, ${e.failed} failed` : ''}`,
@@ -883,7 +889,8 @@ function render(lang){
 
   // Этапы: канонический порядок, поверх него — то, что прислал state.js.
   const given = Array.isArray(S.stages) ? S.stages.filter(Boolean) : [];
-  const stages = STAGE_IDS.map(id => given.find(s => s.id === id) || {id, status:'pending'});
+  const stages = STAGE_IDS.filter(id => !['scout','architecture'].includes(id) || given.some(s => s.id === id))
+    .map(id => given.find(s => s.id === id) || {id, status:'pending'});   // у прогона старой версии этих этапов нет
   const stName = s => L.stages[s.id] || s.id;
   const activeStage = stages.find(s => s.status === 'active');
   const failedStage = stages.find(s => s.status === 'failed');
@@ -1001,7 +1008,7 @@ function render(lang){
       ${big ? `<div class="big"><b>${big}</b><span>${bigSub}</span>
         <span class="paused" data-idle-note hidden>${L.paused}</span></div>` : ''}
     </div>
-    <div class="track" role="list">${segs}</div>
+    <div class="track" role="list" style="--stages:${stages.length}">${segs}</div>
   </section>`;
 
   // ——— плитки ———
@@ -1141,8 +1148,11 @@ function render(lang){
   const g3 = G.G3 ? (G.G3.ok ? gate('G3','ok','check',L.g3ok(live, T.length)) : gate('G3','bad','x',L.g3bad(G.G3.problems || 0))) : later('G3', L.g3later);
   const g4 = G.G4 ? gate('G4', G.G4.ok ? 'ok' : 'warn', G.G4.ok ? 'check' : 'alert',
       L.g4(esc(G.G4.matched), esc(G.G4.checked), Math.max(0, (+G.G4.checked||0) - (+G.G4.matched||0)))) : later('G4', L.g4later);
-  const okGates = ['G1','G2','G3','G4'].filter(g => G[g] && G[g].ok).length;
-  const gatesCard = `<section class="card w"><div class="whead"><h3 class="wt">${L.gates}</h3><span>${L.gatesOf(okGates)}</span></div>${g1}${g2}${g3}${g4}</section>`;
+  const extra = ['GS','GA'].filter(g => G[g]);
+  const ga = extra.map(g => gate(g, G[g].ok ? 'ok' : 'warn', G[g].ok ? 'check' : 'alert', L.ev.gate[g](G[g].ok, G[g]))).join('');
+  const gateIds = extra.concat(['G1','G2','G3','G4']);
+  const okGates = gateIds.filter(g => G[g] && G[g].ok).length;
+  const gatesCard = `<section class="card w"><div class="whead"><h3 class="wt">${L.gates}</h3><span>${L.gatesOf(okGates, gateIds.length)}</span></div>${ga}${g1}${g2}${g3}${g4}</section>`;
 
   // ——— лента ———
   const evText = e => {

@@ -27,6 +27,8 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | 0 Preflight | `phases/0-modes.md`, `phases/0-preflight.md`, then `0-memory.md`, `0-instruments.md` | mode announced, repo configured, dashboard open, `carried.md` after a landed run |
 | 1 Manifest | `phases/1-manifest.md` | `<дата>-brief.md`, `manifest.md` |
 | 2 Briefing | `phases/2-briefing.md` (+ `2-adversarial.md` when it runs) | answers recorded into the manifest |
+| 2a Prior art | `phases/2a-scout.md` | `.autopilot/prior-art.*`: what is taken ready-made and what is written from scratch, gate GS |
+| 2b Architecture | `phases/2b-architecture.md`, then `phases/0-program.md` when the work is over one run | `.autopilot/architecture.md`, audits, gate GA: at least 9 of 10, confirmed by a second critic |
 | 3 Spec | `phases/3-spec.md` | `notes.md` in existing code, `spec.md`, the boundaries in `interfaces.md` |
 | 4 Plan | `phases/4-plan.md`, then `phases/7-instruments.md` before `ap.py tickets` | `tickets/NN-*.md` with type, model, effort, attention, night; the plan commit |
 | 5 Build | `phases/5-subagents.md` | code, one commit per ticket |
@@ -41,7 +43,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | — | `phases/9-memory.md` — also in Phase 5, when a ticket discovered something worth keeping | |
 | — | `phases/rationalizations.md` — on a failed gate, on catching yourself excusing something, once before the report | |
 
-**After a compaction, re-read the state, not the phases:** `state.js` (it holds `dir` and `skillDir`), `manifest.md`, `interfaces.md`, `carried.md` if the run has one, and the file of the phase you are in — in Build, Review and Final also `phases/5-repair.md`: its caps and stop rules are what a long run forgets first. Nothing else.
+**After a compaction, re-read the state, not the phases:** `state.js` (it holds `dir` and `skillDir`), `manifest.md`, `interfaces.md`, `.autopilot/architecture.md` if there is one and Phase 3 has begun, `carried.md` if the run has one, and the file of the phase you are in — in Build, Review and Final also `phases/5-repair.md`: its caps and stop rules are what a long run forgets first. Nothing else.
 
 ## The words the user sees
 
@@ -49,12 +51,13 @@ Phase names here are English and never shown. In the chat, on the dashboard and 
 
 | Stage id | Пользователю |
 |---|---|
-| `preflight` · `manifest` · `briefing` · `spec` | Подготовка · Требования · Брифинг · Спецификация |
+| `preflight` · `manifest` · `briefing` | Подготовка · Требования · Брифинг |
+| `scout` · `architecture` · `spec` | Поиск готового · Архитектура · Спецификация |
 | `plan` · `build` · `review` · `final` | План · Разработка · Код-ревью · Приёмка |
 
 **«Сборка» — весь прогон**, поэтому пятый этап — «Разработка». **Единица работы — «таск»**: «задача» — это то, что поставил пользователь.
 
-The fork adds no stage — the e2e replay is part of «Приёмка», the night and the pacing are ways of running «Разработка» — and the dashboard still knows eight. What it adds the user does see, **one Russian word each**, never the English id:
+The fork adds two stages, `scout` and `architecture`, so the dashboard knows ten; the e2e replay is part of «Приёмка», the night and the pacing are ways of running «Разработка». What it adds the user does see, **one Russian word each**, never the English id:
 
 | Fork concept | Пользователю |
 |---|---|
@@ -77,6 +80,8 @@ Two dials, decided once in Phase 0 (`phases/0-modes.md`): **the mode** — `full
 |---|---|---|---|---|
 | 1 Manifest | auto | auto | auto | auto |
 | 2 Briefing | self-briefing | only what the brief leaves open | the adversarial pass, then every fork | the same |
+| 2a Prior art | auto, never a `fork` | a `fork` or a paid part is a question | the same | the same |
+| 2b Architecture | auto | owner's forks only | owner's forks only | the document → wait for «ок» |
 | 3 Spec | auto | auto | auto | show → wait for «ок» |
 | 4 Plan | auto, notify | auto, stoppable | auto, stoppable | discuss → wait for «ок» |
 | 5 Build · 6 Review | auto | auto | auto | auto |

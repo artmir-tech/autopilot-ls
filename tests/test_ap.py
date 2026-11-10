@@ -48,7 +48,7 @@ def ticket(tid, title, reqs, deps, zone, wave, review="нет", model="sonnet",
             % (tid, title, reqs, deps, " · ".join("`%s`" % z for z in zone), wave, review, extra))
 
 
-class Run(unittest.TestCase):
+class Base(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp(prefix="ap-test-")
         self.git("init", "-q")
@@ -93,12 +93,14 @@ class Run(unittest.TestCase):
         return read(os.path.join(self.dir, "manifest.md"))
 
     # ── init ───────────────────────────────────────────────────────────────
+
+class Run(Base):
     def test_init_creates_run(self):
         self.init()
         s = self.state()
         self.assertTrue(re.match(r"\d{4}-\d{2}-\d{2}-repair-bot--wip$", s["dir"]))
         self.assertTrue(os.path.isdir(os.path.join(self.dir, "tickets")))
-        self.assertEqual([x["status"] for x in s["stages"]], ["active"] + ["pending"] * 7)
+        self.assertEqual([x["status"] for x in s["stages"]], ["active"] + ["pending"] * 9)
         self.assertRegex(s["startedAt"], r"T\d\d:\d\d:\d\d[+-]\d\d:\d\d$")
         self.assertIn("в работе", read(os.path.join(self.a, "README.md")))
         self.assertIn(".autopilot/serve.*", read(os.path.join(self.root, ".gitignore")))
@@ -135,6 +137,7 @@ class Run(unittest.TestCase):
     def test_passed_stage_with_artifact_is_marked_done(self):
         self.init()
         self.write("manifest.md", MANIFEST)
+        self.ap("stage", "architecture", "skip", "--note", "маленькая сборка")
         code, out = self.ap("stage", "spec")
         self.assertEqual(self.stage("manifest")["status"], "done")
         self.assertIn("briefing", out)                     # ни файла, ни отметки — подсказка
@@ -405,10 +408,12 @@ class Run(unittest.TestCase):
         self.plan()
         self.write("manifest.md", MANIFEST.replace("| R02 | «складывает в таблицу» | in-spec",
                                                    "| R02 | «складывает в таблицу» | open"))
+        self.ap("stage", "architecture", "skip", "--note", "маленькая сборка")
         self.ap("stage", "spec")
         g = self.state()["gates"]["G1"]
         self.assertEqual((g["ok"], g["open"], g["total"]), (False, 1, 4))
         self.write("manifest.md", MANIFEST)
+        self.ap("stage", "architecture", "skip", "--note", "маленькая сборка")
         self.ap("stage", "spec", "done")
         self.assertTrue(self.state()["gates"]["G1"]["ok"])
         self.write("manifest.md", MANIFEST.replace("| R02 | «складывает в таблицу» | in-spec",
@@ -482,6 +487,7 @@ class Run(unittest.TestCase):
         """Прогон, которому нечего скрывать: гейты зелёные, таски сданы настоящими коммитами."""
         self.plan()
         self.ap("tickets")
+        self.ap("stage", "architecture", "skip", "--note", "маленькая сборка")
         self.ap("stage", "spec", "done")
         self.ap("check-plan")
         self.ap("coverage", "found=0", "fixed=0", "deferred=0")
@@ -1025,6 +1031,311 @@ class Pure(unittest.TestCase):
     def test_skill_declares_a_version(self):
         text = read(os.path.join(SKILL, "SKILL.md"))
         self.assertIsNotNone(self.m._version(text))
+
+
+class Architecture(Base):
+    """Гейт GA: балл считает ap.py, порог 9, минимум 8, подтверждение вторым критиком, потолок кругов."""
+
+    KEYS = ("product_fit qualities boundaries domain data flows failure security ops testability "
+            "performance evolution simplicity delivery decisions reuse llm legacy").split()
+
+    def audit(self, n, score=9.2, kind="audit", **over):
+        crit = {k: {"score": score, "evidence": "§3: цитата", "gap": "мелочь"} for k in self.KEYS}
+        crit["llm"] = {"na": "в продукте нет моделей"}
+        crit["legacy"] = {"na": "новый проект"}
+        crit["reuse"] = {"na": "маленькая сборка, готовое не искали"}
+        crit.update(over.pop("criteria", {}))
+        body = {"criteria": crit, "findings": [], "prior": [], "summary": "Итог простыми словами",
+                "scenarios": [{"name": "сценарий %d" % i, "verdict": "проходит"} for i in range(5)]}
+        body.update(over)
+        os.makedirs(os.path.join(self.a, "architecture-audit"), exist_ok=True)
+        rel = ".autopilot/architecture-audit/%02d.json" % n
+        with open(os.path.join(self.root, rel), "w", encoding="utf-8") as f:
+            json.dump(body, f, ensure_ascii=False)
+        return self.ap("arch", "round", "--file", rel, "--kind", kind)
+
+    def status(self):
+        return json.loads(read(os.path.join(self.a, "architecture-audit", "state.json")))
+
+    def start(self):
+        self.ap("arch", "start", "--scope", "project")
+
+    def test_a_low_score_asks_for_another_round(self):
+        self.start()
+        code, out = self.audit(1, 7.5)
+        self.assertEqual(code, 0, out)
+        self.assertIn("7.5 из 10", out)
+        self.assertIn("ещё круг", out)
+        self.assertFalse(self.status()["gate"]["ok"])
+
+    def test_the_score_is_weighted_by_the_tool(self):
+        self.start()
+        self.audit(1, 9, criteria={"product_fit": {"score": 6, "evidence": "§1", "gap": "не тот продукт"}})
+        # веса применимых критериев: всего 27, product_fit — 3: (24·9 + 3·6) / 27
+        self.assertEqual(self.status()["rounds"][0]["overall"], 8.67)
+
+    def test_a_high_average_does_not_hide_a_hole(self):
+        self.start()
+        code, out = self.audit(1, 9.5, criteria={"security": {"score": 7, "evidence": "§8", "gap": "нет модели угроз"}})
+        self.assertEqual(code, 0, out)
+        self.assertIn("security 7", out)
+        self.assertFalse(self.status()["rounds"][0]["passed"])
+
+    def test_a_pass_needs_a_second_independent_critic(self):
+        self.start()
+        code, out = self.audit(1, 9.2)
+        self.assertIn("подтверждение", out)
+        self.assertFalse(self.status()["gate"]["ok"])
+        code, out = self.audit(2, 9.1, kind="confirm")
+        self.assertEqual(code, 0, out)
+        self.assertIn("GA пройден", out)
+        self.assertTrue(self.status()["gate"]["ok"])
+
+    def test_nothing_to_confirm_before_a_passing_round(self):
+        self.start()
+        self.audit(1, 8)
+        code, out = self.audit(2, 9.5, kind="confirm")
+        self.assertNotEqual(code, 0)
+        self.assertIn("подтверждать нечего", out)
+
+    def test_a_failed_confirmation_sends_it_back(self):
+        self.start()
+        self.audit(1, 9.2)
+        code, out = self.audit(2, 8.6, kind="confirm")
+        self.assertIn("ещё круг", out)
+        self.assertFalse(self.status()["gate"]["ok"])
+
+    def test_an_incomplete_audit_is_refused_whole(self):
+        self.start()
+        crit = {"data": {"score": 7, "evidence": "§4"}, "failure": {"score": 9.5, "evidence": ""}}
+        code, out = self.audit(1, 9.2, criteria=crit)
+        self.assertNotEqual(code, 0)
+        self.assertIn("data: 7", out)
+        self.assertIn("failure: оценка без доказательства", out)
+        self.assertEqual(self.status()["rounds"], [])
+
+    def test_the_product_cannot_be_marked_not_applicable(self):
+        self.start()
+        code, out = self.audit(1, 9.2, criteria={"product_fit": {"na": "не нужно"}})
+        self.assertNotEqual(code, 0)
+        self.assertIn("product_fit", out)
+
+    def test_a_blocking_finding_cannot_sit_on_a_high_score(self):
+        self.start()
+        finding = {"id": "A1", "severity": "blocking", "criterion": "data", "what": "нет миграций", "fix": "описать"}
+        code, out = self.audit(1, 9.2, findings=[finding])
+        self.assertNotEqual(code, 0)
+        self.assertIn("A1 блокирует", out)
+
+    def test_old_findings_must_be_answered(self):
+        self.start()
+        finding = {"id": "A1", "severity": "major", "criterion": "data", "what": "нет миграций", "fix": "описать"}
+        self.audit(1, 8, findings=[finding])
+        code, out = self.audit(2, 9.2)
+        self.assertNotEqual(code, 0)
+        self.assertIn("A1", out)
+        code, out = self.audit(2, 9.2, prior=[{"id": "A1", "closed": True}])
+        self.assertEqual(code, 0, out)
+
+    def test_an_open_blocking_finding_stops_the_pass(self):
+        self.start()
+        finding = {"id": "A1", "severity": "blocking", "criterion": "data", "what": "нет миграций", "fix": "описать"}
+        low = {"data": {"score": 6, "evidence": "§4", "gap": "нет"}}
+        self.audit(1, 9, criteria=low, findings=[finding])
+        self.audit(2, 9.4, prior=[{"id": "A1", "closed": False}])
+        self.assertFalse(self.status()["rounds"][1]["passed"])
+
+    def test_a_broken_scenario_stops_the_pass(self):
+        self.start()
+        scenarios = [{"name": "отказ базы", "verdict": "ломается"}] + [{"name": "s%d" % i, "verdict": "проходит"} for i in range(4)]
+        code, out = self.audit(1, 9.6, scenarios=scenarios)
+        self.assertIn("отказ базы", out)
+        self.assertFalse(self.status()["rounds"][0]["passed"])
+
+    def test_rounds_are_capped_and_then_it_is_the_owners_call(self):
+        self.start()
+        for n in range(1, 7):
+            code, out = self.audit(n, 8)
+            self.assertEqual(code, 0, out)
+        self.assertIn("потолок", out)
+        code, out = self.audit(7, 9.5)
+        self.assertNotEqual(code, 0)
+        self.assertIn("потолок", out)
+        code, out = self.ap("arch", "waive")
+        self.assertNotEqual(code, 0)
+        code, out = self.ap("arch", "waive", "--by-user", "«идём так»")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.status()["gate"]["waived"], "«идём так»")
+        self.assertTrue(self.status()["gate"]["ok"])
+
+    def test_the_spec_waits_for_the_architecture_or_a_reason(self):
+        self.init()
+        code, out = self.ap("stage", "spec")
+        self.assertNotEqual(code, 0)
+        self.assertIn("архитектура не принята", out)
+        self.ap("stage", "architecture", "skip", "--note", "сборка на 2 тысячи строк")
+        code, out = self.ap("stage", "spec")
+        self.assertEqual(code, 0, out)
+
+    def test_the_stage_closes_only_on_an_accepted_architecture(self):
+        self.init()
+        self.ap("stage", "scout", "skip", "--note", "правки в готовом коде")
+        self.ap("stage", "architecture")
+        code, out = self.ap("stage", "architecture", "done")
+        self.assertNotEqual(code, 0)
+        self.start()
+        self.audit(1, 9.2)
+        self.audit(2, 9.2, kind="confirm")
+        code, out = self.ap("stage", "architecture", "done")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.stage("architecture")["status"], "done")
+
+    def test_the_gate_shows_on_the_run(self):
+        self.init()
+        self.start()
+        self.audit(1, 8)
+        g = self.state()["gates"]["GA"]
+        self.assertEqual((g["ok"], g["score"], g["rounds"]), (False, 8.0, 1))
+
+    def test_it_works_before_any_run_exists(self):
+        self.start()
+        code, out = self.audit(1, 9.2)
+        self.assertEqual(code, 0, out)
+        self.assertFalse(os.path.exists(os.path.join(self.a, "state.js")))
+
+    def test_a_change_reopens_the_gate_and_has_its_own_cap(self):
+        self.start()
+        self.audit(1, 9.2)
+        self.audit(2, 9.2, kind="confirm")
+        code, out = self.audit(3, 9.5)
+        self.assertNotEqual(code, 0)                      # принятая меняется только через delta
+        self.ap("arch", "delta", "--note", "добавили очередь")
+        self.assertFalse(self.status()["gate"]["ok"])
+        code, out = self.audit(3, 9.3, kind="delta")
+        self.assertIn("изменение принято", out)
+        self.assertTrue(self.status()["gate"]["ok"])
+
+    def test_a_ticket_names_its_sections_once_the_architecture_is_accepted(self):
+        self.start()
+        self.audit(1, 9.2)
+        self.audit(2, 9.2, kind="confirm")
+        self.init()
+        self.write("manifest.md", MANIFEST)
+        self.write("tickets/01-a.md", ticket("01", "Ядро", "R01, R02, R05", "—", "`src/`", 1))
+        out = self.ap("check-plan")[1]
+        self.assertIn("нет поля Архитектура", out)
+
+    def test_a_check_against_the_code_does_not_move_the_gate(self):
+        self.start()
+        self.audit(1, 9.2)
+        self.audit(2, 9.2, kind="confirm")
+        code, out = self.audit(3, 6.5, kind="as-built")
+        self.assertEqual(code, 0, out)
+        self.assertTrue(self.status()["gate"]["ok"])
+
+
+class Scout(Base):
+    """Поиск готового: решения по частям, лицензии, владелец решает про чужой проект за основу."""
+
+    FACTS = {"license": "MIT", "stars": 5000, "pushedAt": "2026-10-01", "archived": False, "checkedAt": "2026-11-10"}
+
+    def capability(self, cid="C1", decision="adopt", license="MIT", **over):
+        cap = {"id": cid, "name": "Приём сообщений", "requirements": ["R01"], "core": False, "decision": decision,
+               "choice": "aiogram/aiogram", "why": "зрелая библиотека",
+               "candidates": [{"repo": "aiogram/aiogram", "facts": dict(self.FACTS, license=license)}]}
+        cap.update(over)
+        return cap
+
+    def write_art(self, *caps):
+        with open(os.path.join(self.a, "prior-art.json"), "w", encoding="utf-8") as f:
+            json.dump({"products": [], "capabilities": list(caps)}, f, ensure_ascii=False)
+
+    def check(self, *caps):
+        self.write_art(*caps)
+        return self.ap("scout", "check")
+
+    def test_a_clean_plan_passes_and_counts_what_we_take(self):
+        code, out = self.check(self.capability(), self.capability("C2", "build", candidates=[], searched="искал очереди"))
+        self.assertEqual(code, 0, out)
+        self.assertIn("берём готовым 1, пишем сами 1", out)
+
+    def test_an_unverified_candidate_is_refused(self):
+        cap = self.capability()
+        del cap["candidates"][0]["facts"]
+        code, out = self.check(cap)
+        self.assertIn("не проверен", out)
+
+    def test_copyleft_can_only_be_studied(self):
+        self.assertIn("лицензия GPL-3.0", self.check(self.capability(license="GPL-3.0"))[1])
+        self.assertIn("лицензия none", self.check(self.capability("C1", "adapt", license="none", spike={"result": "да"}))[1])
+        code, out = self.check(self.capability("C1", "learn", license="GPL-3.0"))
+        self.assertNotIn("лицензия", out)
+
+    def test_a_library_may_be_lgpl_but_copied_code_may_not(self):
+        self.assertNotIn("лицензия", self.check(self.capability(license="LGPL-3.0"))[1])
+        self.assertIn("лицензия", self.check(self.capability("C1", "adapt", license="LGPL-3.0", spike={"result": "да"}))[1])
+
+    def test_an_archived_project_is_not_taken(self):
+        cap = self.capability()
+        cap["candidates"][0]["facts"]["archived"] = True
+        self.assertIn("в архиве", self.check(cap)[1])
+
+    def test_what_makes_the_product_needs_the_owners_word(self):
+        self.assertIn("отличает продукт", self.check(self.capability(core=True))[1])
+        self.assertNotIn("отличает продукт", self.check(self.capability(core=True, byUser="«берём»"))[1])
+
+    def test_a_foreign_project_as_a_base_is_the_owners_call_and_needs_a_spike(self):
+        out = self.check(self.capability("C1", "fork"))[1]
+        self.assertIn("решение владельца", out)
+        self.assertIn("проба", out)
+        out = self.check(self.capability("C1", "fork", byUser="«да»", spike={"result": "собирается"}))[1]
+        self.assertIn("GS пройден", out)
+
+    def test_building_ourselves_must_say_what_was_searched(self):
+        self.assertIn("что искали", self.check(self.capability("C1", "build", candidates=[]))[1])
+
+    def test_the_choice_must_be_among_the_candidates(self):
+        self.assertIn("нет среди кандидатов", self.check(self.capability(choice="other/repo"))[1])
+
+    def test_architecture_waits_for_the_search_or_a_reason(self):
+        self.init()
+        code, out = self.ap("stage", "architecture")
+        self.assertNotEqual(code, 0)
+        self.assertIn("поиск готового", out)
+        self.ap("stage", "scout", "skip", "--note", "правки в готовом коде")
+        code, out = self.ap("stage", "architecture")
+        self.assertEqual(code, 0, out)
+
+    def test_the_gate_shows_on_the_run(self):
+        self.init()
+        self.check(self.capability())
+        g = self.state()["gates"]["GS"]
+        self.assertEqual((g["ok"], g["taken"], g["capabilities"]), (True, 1, 1))
+
+    def test_verify_takes_facts_from_github_and_drops_inventions(self):
+        spec = importlib.util.spec_from_file_location("ap_scout", os.path.join(self.a, "ap.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        m.PRIOR_ART = os.path.join(self.a, "prior-art.json")
+        known = {"aiogram/aiogram": {"full_name": "aiogram/aiogram", "license": {"spdx_id": "MIT"},
+                                     "stargazers_count": 5000, "pushed_at": "2026-10-01T10:00:00Z", "archived": False}}
+        m.repo_json = known.get
+        m.package_exists = lambda ref: False if ref == "pypi:nope" else True
+        data = {"products": [{"repo": "made/up"}], "capabilities": [
+            {"id": "C1", "candidates": [{"repo": "aiogram/aiogram", "package": "pypi:nope"}]}]}
+        out = m.cmd_scout_verify(data)
+        self.assertTrue(any("made/up" in x and x.startswith("!") for x in out))
+        self.assertTrue(any("pypi:nope" in x for x in out))
+        facts = data["capabilities"][0]["candidates"][0]["facts"]
+        self.assertEqual((facts["license"], facts["stars"], facts["pushedAt"]), ("MIT", 5000, "2026-10-01"))
+        self.assertNotIn("facts", data["products"][0])
+
+    def test_a_long_silence_is_said_but_does_not_refuse(self):
+        cap = self.capability()
+        cap["candidates"][0]["facts"]["pushedAt"] = "2020-01-01"
+        code, out = self.check(cap)
+        self.assertIn("GS пройден", out)
+        self.assertIn("не обновлялся", out)
 
 
 if __name__ == "__main__":

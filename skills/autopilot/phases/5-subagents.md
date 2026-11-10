@@ -18,6 +18,7 @@ Never two tickets in one context — accumulated context is what makes long sess
 | its ticket | by path; it already carries the verbatim brief quotes |
 | the spec sections the ticket names | `spec.md` by path **and section headings** — not the whole spec, not pasted |
 | `interfaces.md` | by path, read first |
+| the architecture sections the ticket names | `.autopilot/architecture.md` by path and the section numbers from `**Архитектура:**` — not the whole document |
 | `notes.md` | by path, in an existing codebase |
 | `reference.md` | by path, when the ticket builds something the user will look at |
 | the check command, how to run one test file, the gates command | from `interfaces.md` — so it does not derive them |

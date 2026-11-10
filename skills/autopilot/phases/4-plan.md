@@ -46,7 +46,7 @@ Every ticket of the chain carries the same requirement. It applies when the chan
 
 ## Waves and zones
 
-**`wave = 1 + max(wave of what it depends on)`**, no dependencies → wave 1. Then **split each wave by zones**: two tickets writing the same files cannot fly together — the later one moves to the next wave. Every ticket names its **zone** — the directories and modules it owns, tests included. Waves are *discovered* in the dependency graph, never manufactured by splitting a ticket; a wave of one is a normal answer. A wave number, once written, is not renumbered — a real re-cut is said to the user in a line.
+**`wave = 1 + max(wave of what it depends on)`**, no dependencies → wave 1. Then **split each wave by zones**: two tickets writing the same files cannot fly together — the later one moves to the next wave. Every ticket names its **zone** — the directories and modules it owns, tests included. With an accepted architecture zones follow its components, and every ticket except a prompt ticket names its sections in `**Архитектура:**`: `check-plan` refuses one that does not. Waves are *discovered* in the dependency graph, never manufactured by splitting a ticket; a wave of one is a normal answer. A wave number, once written, is not renumbered — a real re-cut is said to the user in a line.
 
 ## Type, review, model, effort, attention — decided per ticket, here
 
@@ -114,6 +114,7 @@ Calibrate, do not trust: after two or three runs, `repairs` by model in `state.j
 **Зависит от:** 01, 02
 **Зона:** `src/bot/` · `tests/bot/`
 **Волна:** 2
+**Архитектура:** §4 bot · §7 приём заявки
 **Тип:** code
 **Ревью:** нет
 **Модель:** sonnet
