@@ -35,7 +35,38 @@ How far to take it is the user's setting:
 
 Each answer becomes an `R##.n` story with its own acceptance line. The number of stories is an output: seven dimensions that matter give seven stories, two give two, and padding is the same defect as skipping.
 
+**Data edges — a closed list.** At `normal` and `deep`, every requirement that accepts data (a text, a number, a date, a file, a list) goes through all eight. This is not a matter of judgement, unlike the table above:
+
+| Edge | The question |
+|---|---|
+| **Boundary** | exactly at the limit, one over, one under? |
+| **Touching** | two ranges that meet, one ending where the next begins — overlap or not? |
+| **Empty** | nothing at all, only spaces, zero? |
+| **Length** | what counts: characters, bytes, an emoji as one? |
+| **Order** | out of order, or a tie — which comes first? |
+| **Rounding** | which way, to what step, who gets the remainder? |
+| **Repeat** | the same thing twice — one result or two? |
+| **Cut-off** | stops halfway — what is kept? |
+
+Each edge is closed **by an acceptance criterion or by a reason it cannot occur**, in the table «Края данных». Silence is not a third answer: an edge left open is decided by the first executor to hit it, and by the next one differently.
+
+**The mark for what only a test can settle.** A criterion whose right answer does not follow from the brief — a limit you chose, a rounding rule, a behaviour the user never described — ends with `Проверка: отдельный тест`. Reading code shows that it does something; only a test shows that it does the agreed thing. Reviewers and the blind check go by this mark, written in advance, and not by how sure they feel (`prompts/review.md`, `phases/8-final.md`).
+
 **Two roads.** *Propose* when the answer is the user's to give — that was a briefing question. *Decide* when it is craft — error text, retry policy, limits, defaults — write it in and say so in the summary. In full, everything is decided and listed in the report; at strict, nothing is offered beyond what was asked.
+
+## Prohibitions — what this must never quietly become
+
+The depth pass asks what happens when things go wrong. This one asks what happens **when everything works and the product is still not what its author wanted**. A coach built to help an author find their words can, with every test green, write the post for them.
+
+At every depth, one pass over the requirements: **what could this quietly become that the author would not want, and that nothing in the spec forbids?** Go wide first, a long list for yourself. Then keep the two or three about the product and its values; injections and leaks belong to the review. For a coach: «не пишет за автора», «не стыдит».
+
+Each one that stays:
+
+- is one sentence in the spec's section «Запреты», numbered `Z1`, `Z2`;
+- has its check: a test that this does not happen, in the ticket that owns the behaviour, or a line in the e2e judge's rubric (`phases/8a-e2e.md`) when only reading the text can tell;
+- **belongs to the owner: a prohibition is method** (`phases/2-briefing.md`). In `semi`, `interview` and `manual`: `ap.py question add`, with your recommendation taken from their own materials, and the work goes on. In `full`: `ASSUMPTION — методика, принято за владельца: …`, with a visible `[МЕТОДИКА — подтверди]` where their materials do not say it. A ticket built on an unconfirmed one is `Внимание: owner`.
+
+A product with nobody to betray — an internal script, a converter — gets one line: «Запретов нет: <почему>». Every reviewer of the build reads this section (`prompts/review.md`).
 
 ## Keeping depth attached
 
@@ -65,7 +96,7 @@ For every unit the build will have: **what it owns**, **what it exposes** (signa
 
 ## The file
 
-**A small product** — one surface, one feature, what Phase 4 will call T0 or T1 — gets a short spec: Задача; Решение with one line per live requirement saying what the user gets, depth included; Решения по реализации; Вне рамок; Открытые места. No stories table — the acceptance criteria are written once, in the ticket.
+**A small product** — one surface, one feature, what Phase 4 will call T0 or T1 — gets a short spec: Задача; Решение with one line per live requirement saying what the user gets, depth included; Запреты; Края данных, when a requirement accepts data; Решения по реализации; Вне рамок; Открытые места. No stories table — the acceptance criteria are written once, in the ticket.
 
 **Otherwise:**
 
@@ -86,6 +117,18 @@ For every unit the build will have: **what it owns**, **what it exposes** (signa
 | 1 | R01 | Как клиент, я оставляю заявку боту, чтобы не звонить | бот принял и подтвердил |
 | 2 | R01.1 | …и вижу понятную ошибку, если связь отвалилась | текст ошибки, не молчание |
 | 3 | A01 → R01 | …и получаю номер заявки, чтобы на него ссылаться | номер в подтверждении |
+| 4 | R01.2 | …и длинное описание не теряется | 2000 знаков проходит, 2001 — просьба сократить, текст сохранён · Проверка: отдельный тест |
+
+## Запреты
+| # | Чем это не должно стать | Чем проверяем | Чьё решение |
+|---|-------------------------|---------------|-------------|
+| Z1 | Бот не обещает срок ремонта от себя | тест: в ответах нет срока, пока его не назвал мастер | вопрос владельцу № 3 |
+
+## Края данных
+| Требование | Край | Чем закрыт |
+|------------|------|------------|
+| R01 | Длина | считаем знаки, эмодзи — один: история 4 |
+| R01 | Соприкосновение | не бывает: интервалов нет |
 
 ## Решения по реализации
 Стек, схема данных, контракты, внешние сервисы — каждое с одной строкой «почему».
@@ -129,7 +172,7 @@ Which section covers which requirement lives in the manifest's «Где» column
 > Не оценивай качество и не предлагай улучшений. Только факт расхождения.
 > Расхождений нет — так и скажи.
 
-Act on it before leaving: *missing* → write the section; *half-covered* → write what was missing; *not in the brief* → attach it to a parent as `A##` or cut it. Record it in one call — `ap.py coverage found=N fixed=N deferred=N --item "…"` with an `--item` for each finding not fixed in the spec — so the report can say whether the gate ever caught anything. A finding here costs a paragraph; the same finding at G4 costs the build.
+Act on it before leaving: *missing* → write the section; *half-covered* → write what was missing; *not in the brief* → attach it to a parent as `A##` or cut it; a row of «Запреты» or «Края данных» is not scope, leave it. Record it in one call — `ap.py coverage found=N fixed=N deferred=N --item "…"` with an `--item` for each finding not fixed in the spec — so the report can say whether the gate ever caught anything. A finding here costs a paragraph; the same finding at G4 costs the build.
 
 ## Showing it
 

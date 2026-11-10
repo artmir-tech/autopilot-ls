@@ -146,6 +146,7 @@ Calibrate, do not trust: after two or three runs, `repairs` by model in `state.j
 
 - **The verbatim brief quotes are not decoration** — they are the last thing standing between a fresh context and a plausible reinterpretation, and the point reviewer judges the Manifest axis from them.
 - **Every criterion is checkable and false at the commit the executor starts from.** A criterion already true tests nothing; the executor proves each one red before building it (`prompts/executor.md`).
+- **Every closed edge and every prohibition has a home.** A row of «Края данных» closed by a criterion, and a `Z#` checked by a test, is a line in «Критерии приёмки» of the ticket that owns that behaviour, and the test lives there. `Проверка: отдельный тест` stays on the criterion. A test that something does not happen is green before anything is built: its `REDPROOF` is a deliberate violation, put in and taken out.
 - No file paths or code snippets except a structure prose states worse — a schema, a state machine.
 - `Зависит от` lists ticket numbers only — `01, 02`, or `—`. A reference that is not a ticket's id fails `check-plan`.
 - **`Тип`, `Модель`, `Усилие`, `Внимание`, `Ночью` are required** — `check-plan` refuses a ticket without one, with a value outside the lists above, with `Ночью: да` beside `Внимание: owner`, or a `migration` sharing its wave.

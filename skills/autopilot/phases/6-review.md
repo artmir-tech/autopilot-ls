@@ -25,7 +25,7 @@ Merged or ranked together, one axis masks another. **Which axis a finding belong
 
 **Launch it in the background right after the commit** — `ap.py ticket NN review`, then the subagent — and go on with the build: launch the next wave, land other tickets. Waiting on a point review is never a reason to hold a wave.
 
-It gets, by path: **`prompts/review.md`** (`skillDir`), required reading before the diff; the ticket file — its brief quotes are the Manifest axis; the spec sections the ticket names; `interfaces.md`; whatever the repo documents about how code is written. Pasted: the executor's `TESTS`, `GATES` and `REDPROOF` lines, and **why it is reviewed** — «фундамент», the named risk, or «оговорка о требовании»: that decides what blocks. And the command that shows the whole ticket — `git diff <base>..<commit>` (`tickets[].base` and `.commit` in `state.js`: a ticket lands as a series of small commits). It must not repair, refactor, spawn agents or invoke any skill but `ub-mode`.
+It gets, by path: **`prompts/review.md`** (`skillDir`), required reading before the diff; the ticket file — its brief quotes are the Manifest axis; the spec sections the ticket names, and always the section «Запреты»; `interfaces.md`; whatever the repo documents about how code is written. Pasted: the executor's `TESTS`, `GATES` and `REDPROOF` lines, and **why it is reviewed** — «фундамент», the named risk, or «оговорка о требовании»: that decides what blocks. And the command that shows the whole ticket — `git diff <base>..<commit>` (`tickets[].base` and `.commit` in `state.js`: a ticket lands as a series of small commits). It must not repair, refactor, spawn agents or invoke any skill but `ub-mode`.
 
 What comes back is a verdict per axis and a `BLOCKING` line. Nothing blocking → `ap.py ticket NN done` again, and the ticket is finished. `BLOCKING` → `phases/5-repair.md`, verbatim: the fix is a second commit of the same zone. `FINDINGS` → `ap.py add concerns "…" "…"`, one call, each with its file and line. Neither the diff nor the reasoning reaches you.
 
@@ -42,6 +42,7 @@ What comes back is a verdict per axis and a `BLOCKING` line. Nothing blocking �
 - **Spec *extra*** — surface nobody asked for, unless the rest genuinely needs it.
 - **A red check or a red gate** — build, typecheck, lint, CRAP, duplicates, mutants. These block **before** review, by the orchestrator's own run; they appear here so nobody waits for a reviewer to say it.
 - **A test bound to internals** the next ticket has the right to rewrite.
+- **A broken prohibition** (`Z#` in the spec), and **a criterion marked `Проверка: отдельный тест` that has no test**.
 - **In the foundation, a defect the following tickets will build on** — a wrong key in the schema, a shared client that fails the next ticket's call, access that ignores the boundary the spec drew.
 - **For a risky ticket, a hole in that risk** — the security list in `prompts/review.md`.
 
