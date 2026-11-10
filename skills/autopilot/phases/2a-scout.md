@@ -4,6 +4,12 @@
 
 **The goal is not to find a project to copy.** Nearly all the value is in the small end: a library for a commodity part (a Telegram framework, a date parser, a job queue) adopted as a dependency, behind a port. Taking a whole foreign project as a base is rare, usually costs more than it saves, and is never decided by an agent.
 
+## 0. Size first, code first
+
+**Size.** One line to yourself, from the brief and the briefing: «~N тысяч строк: …». Up to ~3K is T0, up to ~6K T1, up to ~18K T2, up to ~36K T3; more, or several weeks of work, is a program of several runs. Phases 2a and 2b both route on it.
+
+**Existing code.** When Phase 0 found code, run the exploring subagent described at the top of `phases/3-spec.md` **now**: the scout must know the stack and the dependencies already there, and the architect gets the same `notes.md`. Phase 3 does not repeat it.
+
 ## 1. When
 
 | Situation | What runs |
@@ -55,13 +61,13 @@ python3 .autopilot/ap.py scout check      # гейт GS
 
 ## 5. The spike
 
-A candidate that will carry a whole component (`adapt`, `fork`, or an `adopt` the scout marked `risky`) is proved before the architect leans on it: one subagent, `opus` · `medium`, `isolation: "worktree"`, one question — «does it do X, on our stack, under our constraints» — at most two spikes a run. It returns the facts; you write them to `spike: {"result": "…", "note": "…"}` in the capability, and the worktree is removed. No code from a spike is kept.
+A candidate that will carry a whole component (`adapt`, `fork`, or an `adopt` the scout marked `risky`) is proved before the architect leans on it: one subagent, `opus` · `medium`, working in a fresh temporary directory (`mktemp -d`), one question — «does it do X, on our stack, under our constraints» — at most two spikes a run. It returns the facts; you write them to `spike: {"result": "…", "note": "…"}` in the capability. No code from a spike is kept. A spike that needs an account or a key the owner has not given becomes a card on their page, and the capability stands as `learn` until it is done.
 
 ## 6. What the owner sees
 
 Two lines in the chat: what is being taken ready-made, what will be written from scratch, and why the second part is ours. In `.autopilot/prior-art.md`, the same as a table.
 
-A `fork`, or a paid service, or a `core` part proposed for `adopt`, is a card on the owner's page: `ap.py question add …` with what it saves and what it costs. `semi`, `interview`, `manual` wait for the answer before the architect starts. **`full` does not take a `fork`**: it goes on with `learn`, and the card waits for the next list.
+A `fork`, or a paid service, or a `core` part proposed for `adopt`, is a card on the owner's page: `ap.py question add …` with what it saves and what it costs. `semi`, `interview`, `manual` wait for the answer before the architect starts: `ap.py ask briefing --note "…"` and the text of `ap.py question list` in the chat. **`full` does not take a `fork`**: it goes on with `learn`, and the card waits for the next list.
 
 Then `ap.py stage scout done`, and on to `phases/2b-architecture.md`.
 

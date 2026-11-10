@@ -2,6 +2,8 @@
 
 `ap.py stage briefing`. The phase the user is actually needed for. Its job is not to collect wishes: it is to **close what cannot be built as written**, and — where the mode or depth asks — to find out what the brief got wrong while changing it is still free. Every question exists to move a row in the manifest.
 
+**A project with a past**: read `.autopilot/project/questions.json` first, if it exists. What is in `resolved` is answered; what is open is not asked twice.
+
 **Depth decides how much gets opened up; the mode decides who closes it.** A fork found at `deep` is the same fork in every mode — in full you settle it and label the decision, in interview you put it to the user.
 
 **When the adversarial pass runs** — mode `interview` or `manual` at any depth, or depth `deep` in any mode — read `phases/2-adversarial.md` and run it **before** the first question. Otherwise skip it.

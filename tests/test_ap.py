@@ -1344,6 +1344,14 @@ class Scout(Base):
         cap["candidates"][0]["archivedWhy"] = "пакет обновляется, код переехал"
         self.assertIn("GS пройден", self.check(cap)[1])
 
+    def test_a_choice_is_required_and_risky_means_a_spike(self):
+        self.assertIn("не назван выбор", self.check(self.capability(choice=None))[1])
+        self.assertIn("нужна проба", self.check(self.capability(risky=True))[1])
+        self.assertIn("GS пройден", self.check(self.capability(risky=True, spike={"result": "работает"}))[1])
+
+    def test_copied_code_is_no_way_around_what_makes_the_product(self):
+        self.assertIn("отличает продукт", self.check(self.capability("C1", "adapt", core=True, spike={"result": "да"}))[1])
+
     def test_a_long_silence_is_said_but_does_not_refuse(self):
         cap = self.capability()
         cap["candidates"][0]["facts"]["pushedAt"] = "2020-01-01"
@@ -1569,6 +1577,62 @@ class Project(Base):
         self.program()
         self.init()
         self.assertIn("на странице чисто", self.ap("project", "lint")[1])
+
+    def test_an_open_change_holds_the_landing_even_when_the_stage_was_skipped(self):
+        self.program()
+        self.init()
+        self.accept_architecture()
+        self.ap("stage", "architecture", "skip", "--note", "архитектура проекта принята")
+        self.ap("arch", "delta", "--note", "добавили очередь")
+        m = self.module()
+        s = self.state()
+        self.assertEqual(m.ls_arch_landing(s)[0][:2], "GA")
+
+    def test_repair_tickets_do_not_need_sections(self):
+        self.accept_architecture()
+        self.init()
+        self.write("manifest.md", MANIFEST)
+        self.write("tickets/01-a.md", ticket("01", "Первый", "R01, R02, R05", "—", ["src/a/"], 1).replace("**Волна:**", "**Архитектура:** §4\n**Волна:**"))
+        self.write("tickets/F1-remont.md", ticket("F1", "Ремонт", "R01", "—", ["src/b/"], 2))
+        self.assertNotIn("нет поля Архитектура", self.ap("check-plan")[1])
+
+    def test_a_planning_session_is_marked_from_the_start(self):
+        self.init()
+        self.ap("arch", "start", "--scope", "project")
+        self.assertTrue(self.state()["programPlan"])
+
+    def test_the_program_remembers_mode_and_depth(self):
+        self.program(PROGRAM_V2.replace("Параллельно: 1", "Режим: full\nГлубина: deep\nПараллельно: 1"))
+        out = self.ap("program")[1]
+        self.assertIn("Режим: full", out)
+        self.assertIn("Глубина: deep", out)
+
+    def test_more_than_one_lane_is_said_out_loud(self):
+        self.program(PROGRAM_V2.replace("Параллельно: 1", "Параллельно: 2"))
+        self.assertIn("один прогон на папку", self.ap("program", "check")[1])
+
+    def test_the_questions_page_exists_without_a_program(self):
+        self.init()
+        code, out = self.ap(*self.QUESTION)
+        self.assertEqual(code, 0, out)
+        d = self.page_data("questions.html")
+        self.assertFalse(d["hasProject"])
+        self.assertEqual(len(d["open"]), 1)
+        self.assertIn("только страница вопросов", self.ap("project")[1])
+
+    def test_the_headline_of_a_landed_run_does_not_outlive_it(self):
+        self.program()
+        self.ap("project", "now", "--state", "Сдан первый")
+        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--program", "P02")
+        self.assertIn("Идёт сейчас: Бот", self.page_data()["p"]["now"]["state"])
+
+    def test_the_questions_hero_tells_the_truth_about_urgency(self):
+        self.program()
+        self.init()
+        self.ap(*self.QUESTION, "--urgency", "Закрывает запуск")
+        self.assertIn("нельзя выходить к людям", self.page_data("questions.html")["heroNote"])
+        self.ap(*self.QUESTION, "--urgency", "Останавливает работу")
+        self.assertIn("Работа стоит", self.page_data("questions.html")["heroNote"])
 
     def test_the_architecture_and_the_ready_made_parts_reach_the_page(self):
         self.program()

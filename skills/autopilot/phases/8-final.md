@@ -63,7 +63,9 @@ Record it in one call — `ap.py blind checked=N matched=M --mismatch "…" --mi
 
 ## 1b. A run of a program: the code against the architecture
 
-When `state.js` has `program` and the project has an accepted architecture: one critic, `opus` · `high`, mode `as-built` (`phases/2b-architecture.md` §7), then `ap.py arch round --kind as-built --file …`. What this run can still close cheaply joins the fixes above; the rest goes into the next run's brief, `.autopilot/briefs/P0N.md`, under «Наследство прошлого прогона», or becomes an `arch delta`. One look; it does not hold the landing.
+When `state.js` has `program` and the project has an accepted architecture: one critic, `opus` · `high`, mode `as-built` (`phases/2b-architecture.md` §7), then `ap.py arch round --kind as-built --file …`. Its findings never reopen this run: they go into the next run's `.autopilot/briefs/P0N-context.md`, under «Наследство прошлого прогона», or become an `arch delta`. One look; it does not hold the landing.
+
+**The last row of a program**, before `finish`: one more blind check, of the whole program against `.autopilot/program-brief.md`, exactly as above. It is not recorded with `ap.py blind`; one line per drift goes to `ap.py add report` and into «Открытые вопросы».
 
 ## 2. Memory and ADRs
 

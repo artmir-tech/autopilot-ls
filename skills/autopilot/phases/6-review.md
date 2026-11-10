@@ -25,7 +25,7 @@ Merged or ranked together, one axis masks another. **Which axis a finding belong
 
 **Launch it in the background right after the commit** — `ap.py ticket NN review`, then the subagent — and go on with the build: launch the next wave, land other tickets. Waiting on a point review is never a reason to hold a wave.
 
-It gets, by path: **`prompts/review.md`** (`skillDir`), required reading before the diff; the ticket file — its brief quotes are the Manifest axis; the spec sections the ticket names; `interfaces.md`; whatever the repo documents about how code is written. Pasted: the executor's `TESTS`, `GATES` and `REDPROOF` lines, and **why it is reviewed** — «фундамент», the named risk, or «оговорка о требовании»: that decides what blocks. And the command that shows the whole ticket — `git diff <base>..<commit>` (`tickets[].base` and `.commit` in `state.js`: a ticket lands as a series of small commits). It must not repair, refactor, invoke skills or spawn agents.
+It gets, by path: **`prompts/review.md`** (`skillDir`), required reading before the diff; the ticket file — its brief quotes are the Manifest axis; the spec sections the ticket names; `interfaces.md`; whatever the repo documents about how code is written. Pasted: the executor's `TESTS`, `GATES` and `REDPROOF` lines, and **why it is reviewed** — «фундамент», the named risk, or «оговорка о требовании»: that decides what blocks. And the command that shows the whole ticket — `git diff <base>..<commit>` (`tickets[].base` and `.commit` in `state.js`: a ticket lands as a series of small commits). It must not repair, refactor, spawn agents or invoke any skill but `ub-mode`.
 
 What comes back is a verdict per axis and a `BLOCKING` line. Nothing blocking → `ap.py ticket NN done` again, and the ticket is finished. `BLOCKING` → `phases/5-repair.md`, verbatim: the fix is a second commit of the same zone. `FINDINGS` → `ap.py add concerns "…" "…"`, one call, each with its file and line. Neither the diff nor the reasoning reaches you.
 
@@ -51,7 +51,7 @@ Everything else waits for the whole-branch review. **You do not widen the list**
 
 After the build: `ap.py stage review`.
 
-**First the gates over the whole run**: `make gates CHANGED=1 BASE=<baseCommit> 2>&1 | tail -15` — after every executor has landed, alone on the machine, with `MUTATE_WORKERS` workers (`standards/gates.md`, «Нагрузка на машину»). Red lines go straight into `F1` as criteria — they are facts, not findings, and no reviewer is spent on them. The full mutation run without `CHANGED` is a night job (`phases/5-night.md`), not this step.
+**First the gates over the whole run** — no `make gates` in the project (a T0 without them, `phases/4-plan.md`): one line in the report and on — `make gates CHANGED=1 BASE=<baseCommit> 2>&1 | tail -15` — after every executor has landed, alone on the machine, with `MUTATE_WORKERS` workers (`standards/gates.md`, «Нагрузка на машину»). Red lines go straight into `F1` as criteria — they are facts, not findings, and no reviewer is spent on them. The full mutation run without `CHANGED` is a night job (`phases/5-night.md`), not this step.
 
 **Two fresh subagents, in parallel, one message** — the axes split, because merged they mask each other and because Craft is the half the gates already narrowed:
 

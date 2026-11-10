@@ -13,11 +13,12 @@ The first session of a big project builds nothing. It goes through the ordinary 
 | 1 | Manifest, Briefing (`phases/1-manifest.md`, `phases/2-briefing.md`) — the whole brief, once | the run's `manifest.md`; a copy of the brief as `.autopilot/program-brief.md` |
 | 2 | Prior art, scope `project` (`phases/2a-scout.md`) | `.autopilot/prior-art.*` |
 | 3 | Architecture, scope `project` (`phases/2b-architecture.md`) | `.autopilot/architecture.md`, gate GA |
-| 4 | The master plan (§2, §3) | `.autopilot/program.md`, one brief per run |
+| 4 | `ap.py stage spec skip --note "план программы: спецификации пишут прогоны"`, `ap.py stage plan`, then the master plan (§2, §3) | `.autopilot/program.md`, a brief and a context file per run |
 | 5 | `ap.py program check` — zero `!` | every run sized, every requirement placed |
 | 6 | The owner's page published (§6) | the whole project visible before any code exists |
-| 7 | `ap.py program plan --result "<сколько прогонов и что в итоге будет>"` | stages from Spec on closed as skipped; the run's folder loses `--wip` |
-| 8 | commit: `git add -A -- .autopilot AGENTS.md CLAUDE.md .gitignore`, «Autopilot: план программы», only paths that exist | the plan is on record |
+| 7 | `.autopilot/PROGRESS.md` by the format of `phases/8-final.md` §4: «Договорились» from the briefing, «Не доделано» from the `deferred` rows | what later runs read first |
+| 8 | `ap.py program plan --result "<сколько прогонов и что в итоге будет>"` | remaining stages closed as skipped; the run's folder loses `--wip` |
+| 9 | the secrets and personal-data scan over `.autopilot/` (`phases/1-manifest.md`), then commit: `git add -A -- .autopilot AGENTS.md CLAUDE.md .gitignore`, «Autopilot: план программы», only paths that exist | the plan is on record |
 
 `semi`, `interview`, `manual`: show the list of runs in plain words and wait for «ок» before step 7. `full`: go on and put it in the report.
 
@@ -29,6 +30,8 @@ The first session of a big project builds nothing. It goes through the ordinary 
 # Программа — <проект>
 
 Бриф программы: `.autopilot/program-brief.md`. Архитектура: `.autopilot/architecture.md`.
+Режим: full
+Глубина: normal
 Параллельно: 1
 
 ## Прогоны
@@ -54,14 +57,14 @@ The first session of a big project builds nothing. It goes through the ordinary 
 | `Дней` | you | calendar days, an honest guess. A real week of runs is the calibration, not optimism |
 | `Простыми словами`, `Что это даёт` | you | **the owner's words**: no codes, no jargon. «Подключение моделей», never «LLM-слой» |
 
-`Параллельно: N` is how many runs may fly at once; the Gantt lays runs into that many lanes. **Rows go in dependency order**: a run depends only on rows above it, `program check` says so.
+`Режим:` and `Глубина:` are the dials of every run started by a bare `/autopilot-ls`. `Параллельно:` stays 1: `ap.py` carries one run per checkout, and the Gantt with it. Above 1 means separate checkouts by hand, and this page will not see them. **Rows go in dependency order**: a run depends only on rows above it, `program check` says so.
 
 ## 3. Cutting the runs
 
 - Cut along section 16 of the architecture, «Порядок сборки». Each run a coherent product slice that **lands green on its own**, the groundwork first, by the size rules of `phases/4-plan.md` one level up.
 - **Every live requirement belongs to a run**: the manifest's «Где» column names its `P##`, and `program check` refuses a row left without one. Nothing quietly vanishes between runs either.
 - **Shared resources are dealt out here**: migration numbers, shared files, contracts between runs. Parallel runs that were not told collide — two runs both took migration number three in a real rebuild.
-- **Each run gets its brief now**: `.autopilot/briefs/P03.md` — first line «Прогон P03 программы — фрагмент брифа программы, дословно», then the verbatim slice of `program-brief.md`, then the architecture sections it builds and what it may rely on from the runs before it. That is what «the project is already written down» means: a later session needs no memory of this one.
+- **Each run gets two files now.** `.autopilot/briefs/P03.md` is what G2 and G4 will judge against: a quote line «> Фрагмент брифа программы, дословно.» and the verbatim slice of `program-brief.md`, nothing else. `.autopilot/briefs/P03-context.md` is for building: the architecture sections it builds, what it may rely on from the runs before it, and every decision and refusal from the briefing that touches its slice — «SMS не надо» must reach the run that would have built SMS. That is what «the project is already written down» means: a later session needs no memory of this one.
 - Dependencies are runs, not tickets: P03 needs what P02 *landed*, read from P02's `interfaces.md` and `PROGRESS.md`, never from a run still in flight.
 - Cutting is your process decision. **What is in the product is not**: whether a capability is wanted at all stays the owner's.
 
@@ -76,7 +79,7 @@ python3 .autopilot/ap.py stage architecture skip --note "архитектура 
 
 If its brief does change the architecture: `arch delta` (`phases/2b-architecture.md` §6).
 
-Its brief: `.autopilot/briefs/P03.md` becomes the run's `<дата>-brief.md`. Its manifest atomises only that slice; G4 checks only that slice.
+Its brief: `.autopilot/briefs/P03.md` becomes the run's `<дата>-brief.md`; `P03-context.md` goes to Phase 3. Its manifest atomises only that slice; G4 checks only that slice.
 
 ## 5. Moving through the program
 
@@ -84,8 +87,8 @@ Its brief: `.autopilot/briefs/P03.md` becomes the run's `<дата>-brief.md`. I
 
 1. **A run lands** → its row is `landed`; the report names the next: «Следующий прогон — “Разговор с автором”. Скажи `/autopilot-ls` в новой сессии — продолжу с него».
 2. **A new session, not this one.** A run leaves the orchestrator's context at its heaviest. With the owner's standing permission — asked once, like the night task (`phases/5-night.md`) — a one-off scheduled task a few minutes ahead says `/autopilot-ls` in a fresh session; without it, the owner says it.
-3. **`/autopilot-ls` with no unfinished run and a program on disk** → the next row: `init --program P03`, and Phase 1 from its brief file. No row runnable → say why in one line and stop.
-4. **After the last row lands** — one blind check of the whole program against `program-brief.md`, exactly as G4 (`phases/8-final.md`), one line per drift into the last run's report.
+3. **A bare `/autopilot-ls` with no unfinished run and a program on disk** → the next row: `init --program P03` with the program's mode and depth, and Phase 1 from its brief file. No row runnable → say why in one line and stop. All rows landed, or the command carries a brief → `phases/0-preflight.md`, the table.
+4. **Before the last row lands** — one blind check of the whole program against `program-brief.md` (`phases/8-final.md` §1b).
 
 Night runs never start a new run of the program: the night flies the queue of the run in flight.
 
@@ -126,6 +129,8 @@ python3 .autopilot/ap.py question list      # текст для чата: на �
 ```
 
 Every field is mandatory because the owner must be able to answer without opening anything else. On the page each question has «Ок, как рекомендуешь» or their own text, and one button copies all the answers into one message. **A decision is only what arrives in the chat**: then `ap.py question answer N --by-user "<их слова>" [--decision "…"]`, `ap.py manual done KEY --by-user "<их слова>"`. Numbers are never reused, so an answer saved in the browser cannot land on a different question.
+
+**An answer goes where it counts**: their words, verbatim, into `## Дополнения` of the current run's brief (`phases/1-manifest.md`), because G2 and G4 read nothing else; into the `*-context.md` of any run it touches; and, if it lasts, into «Договорились» of `PROGRESS.md`.
 
 - **Reversible** → go by the recommendation, record it, keep the card until they have seen it.
 - **Write at once only** if all the work is stopped, or it is safety, money beyond what was approved, or something irreversible.

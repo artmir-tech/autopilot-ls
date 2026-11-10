@@ -2,7 +2,7 @@
 
 Read in Phase 0 with `phases/0-preflight.md`. Both dials are decided once, from what the user typed, announced in one block, and only *applied* from then on.
 
-Everything after `/autopilot-ls` splits into **the mode** (`full`, `semi`, `interview`, `manual`), **the depth** (`strict`, `deep`) and **the brief** — everything else. Bare words, any order, both optional; anything unrecognised is brief. `/autopilot-ls full deep интернет-магазин керамики` — full mode, deep elaboration. The word `night` («ночной режим») is not a mode: it resumes a run in the night queue (`phases/5-night.md`), and only a scheduled task says it.
+Everything after `/autopilot-ls` splits into **the mode** (`full`, `semi`, `interview`, `manual`), **the depth** (`strict`, `deep`) and **the brief** — everything else. Bare words, any order, both optional; anything unrecognised is brief. `/autopilot-ls full deep интернет-магазин керамики` — full mode, deep elaboration. A bare `/autopilot-ls` that starts the next run of a program takes both dials from `Режим:` and `Глубина:` in `program.md` — a scheduled task must not silently turn a `full` project into a `semi` one. The word `night` («ночной режим») is not a mode: it resumes a run in the night queue (`phases/5-night.md`), and only a scheduled task says it.
 
 ## Mode — how much the user is asked
 

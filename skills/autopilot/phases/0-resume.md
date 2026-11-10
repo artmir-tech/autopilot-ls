@@ -11,4 +11,5 @@ Read only when `.autopilot/state.js` exists with `finishedAt: null` and no other
 7. **Run the project's check once** before the next launch. Red → name the failure in the next executor's prompt, so it does not read someone else's breakage as its own.
 8. **Continue from the frontier** — the current phase, or the next launchable tickets.
 9. **A run of a program** (`program` in `state.js`) resumes as itself — the program row stays `in-flight` until `finish` lands it. Only after that does `/autopilot-ls` move on to the next row (`phases/0-program.md`).
+9a. **`programPlan` in `state.js`** — this is the planning session of a program, not an ordinary run: continue from `phases/0-program.md` §1, the first step whose result is not on disk.
 10. **Started as `/autopilot-ls night`** — steps 1–7 without a single question (a `waiting` stays for the morning report), then `phases/5-night.md` instead of step 8.

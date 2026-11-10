@@ -237,6 +237,7 @@ async function copyAnswers(){
   try{
     data = JSON.parse(document.getElementById("data").textContent);
     key = "ap-questions-" + data.key;
+    if(!data.hasProject) document.querySelector(".back").remove();
     load();
     const a = data.open.length, b = data.manual.length;
     const parts = []; if(a) parts.push(`${a} ${pl(a,"вопрос","вопроса","вопросов")}`); if(b) parts.push(`${b} ${pl(b,"дело руками","дела руками","дел руками")}`);

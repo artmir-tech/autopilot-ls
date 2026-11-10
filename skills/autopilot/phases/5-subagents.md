@@ -84,6 +84,7 @@ STATUS: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
 WORKTREE: <абсолютный путь> · <ветка>
 FILES: созданные и изменённые — только пути
 TESTS: команда проверки → результат и сколько было до тебя (`npm run check` → 34 passed, было 21)
+STANDARD: ub-mode загружен скиллом
 GATES: crap max 7.4 · dry 0 пар ≥0.8 · mutants 38/41 убито, выжившие: <имена>
 REDPROOF: новый тест → чем он падал до кода (одна строка на тест, до пяти)
 INTERFACES: публичные сигнатуры, схемы, форматы событий, которые ты выставил

@@ -7,7 +7,8 @@ Configure the repo, pick the project memory, raise the instruments. Decide which
 | your own prompt says `role: worker` | **you are a worker of someone else's run** (`phases/5-sessions.md`) | no run at all — never start, resume or write `state.js`; follow the brief and `prompts/executor.md`, return the contract in your `status/NN.json` |
 | `state.js` with `finishedAt: null`, `updatedAt` under five minutes old **and** the server in `.autopilot/serve.pid` answering | **the run is going on in another window** | nothing — say so in one line and ask which window carries on. With `dispatch: sessions` the other windows are the run's own workers: only the orchestrator writes `state.js`, so there is never a second orchestrator to choose |
 | `state.js` with `finishedAt: null` | **resume** | read `phases/0-resume.md` and follow it instead of this file |
-| `state.js` with `finishedAt` set, or none, **and `.autopilot/program.md`** | **the next run of a program** | `phases/0-program.md` picks the row and its brief slice; then everything below, `init --program P0N` |
+| `state.js` with `finishedAt` set, or none, `.autopilot/program.md` with a row still to fly, **and a bare `/autopilot-ls`** | **the next run of a program** | `phases/0-program.md` picks the row and its brief; then everything below, `init --program P0N` |
+| the same, **but the command carries a brief** | **new work inside a program** | one question: новым прогоном в программу или отдельной сборкой. `full`: a new row at the end of the program. An owner's words are never lost to the next row |
 | `state.js` with `finishedAt` set | **new feature in a configured repo** | everything below; `init` archives the finished run's state into its own directory |
 | no `.autopilot/state.js` | **new run** | everything below, in order |
 
@@ -28,7 +29,7 @@ The «another window» case needs both marks: two sessions writing one `state.js
 
 ## 2. Git
 
-No repo → `git init` now. Write `.gitignore` before anything else is created, with at least `.env`, `.env.*`, `!.env.example`, `node_modules/`, `__pycache__/`, `.DS_Store`, `.claude/worktrees/`, and in a project with a local dialogue corpus `tests/e2e/local/` (`phases/8a-e2e.md`) — executors build in worktrees there (`phases/5-subagents.md`), and a worktree committed into the main branch is a second copy of the project. `.autopilot/` is **committed**, not ignored — it is the user's record of what was promised and delivered; only its `serve.*` files are ignored, and `init` adds that line. The first commit happens at the end of Phase 4 (`phases/4-plan.md`).
+No repo → `git init` now. Write `.gitignore` before anything else is created, with at least `.env`, `.env.*`, `!.env.example`, `node_modules/`, `__pycache__/`, `.DS_Store`, `.claude/worktrees/`, and in a project with a local dialogue corpus `tests/e2e/local/` (`phases/8a-e2e.md`) — executors build in worktrees there (`phases/5-subagents.md`), and a worktree committed into the main branch is a second copy of the project. `.autopilot/` is **committed**, not ignored — it is the user's record of what was promised and delivered; only its `serve.*` files are ignored, and `init` adds that line. The first commit happens when the architecture is accepted, or, when that stage is skipped, at the end of Phase 4 (`phases/4-plan.md`).
 
 **Git must be able to write here, and that is checked now, not at the first ticket:** `git add -- .gitignore`. A refusal — `.git/index.lock: Permission denied`, a sandbox saying no — stops the run before the briefing: `ap.py ask stop --note "git не пишет: <что ответил>"` and one plain sentence to the user. Every rollback point and the blind checker's clean clone depend on commits. Never turn a sandbox off or widen a permission on your own to get past it.
 

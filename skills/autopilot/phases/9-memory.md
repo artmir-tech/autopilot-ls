@@ -5,7 +5,7 @@ The file the **next** session reads first. Chosen in Phase 0 (`phases/0-memory.m
 | File | Answers | Lifetime |
 |---|---|---|
 | `.autopilot/<dir>/` | what was promised and delivered **in this run** | history |
-| `interfaces.md` | what earlier tickets built, for the tickets still to come | dies with the run |
+| `interfaces.md` | what earlier tickets built, for the tickets still to come | dies with the run; a later run of a program carries over what it depends on |
 | the memory file | what an agent needs to work here **tomorrow** | present tense |
 | `docs/adr/` | **why** it is this way, and what was rejected | past tense on purpose |
 | `CONTEXT.md` | what the project's words **mean**, and which synonyms to avoid | present tense, no code |

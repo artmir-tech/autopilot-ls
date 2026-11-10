@@ -744,7 +744,9 @@ def cmd_program(pos, opt, multi=None):
         return cmd_program_plan(opt)
     if pos[:1] == ["check"]:
         problems = program_problems(read_state())
-        return ["! " + p for p in problems] or ["мастер-план сходится: прогонов %d" % len(program_rows(program_lines()))]
+        lanes = program_parallel(program_lines() or [])
+        note = ["! Параллельно: %d — ap.py ведёт один прогон на папку; остальным нужны свои копии проекта, а страница их не увидит" % lanes] if lanes > 1 else []
+        return ["! " + p for p in problems] + note or ["мастер-план сходится: прогонов %d" % len(program_rows(program_lines()))]
     lines = program_lines()
     if lines is None:
         die("программы нет — .autopilot/program.md пишется по phases/0-program.md")
@@ -767,6 +769,9 @@ def cmd_program(pos, opt, multi=None):
                 nxt = r
     head = ("следующий: %s — %s" % (nxt["id"], nxt["title"])) if nxt else (
         "программа сдана" if rows and all(r["status"] == "landed" for r in rows) else "следующего нет")
+    dials = [x.strip() for x in lines if re.match(r"^(Режим|Глубина):", x)]
+    if dials:
+        head += " · " + " · ".join(dials)
     flying = [r["id"] for r in rows if r["status"] == "in-flight"]
     return [head] + (["в работе: " + ", ".join(flying)] if flying else []) + out
 
@@ -907,17 +912,19 @@ def scout_capability_problems(c):
         if not c.get("candidates") and not text_of(c.get("searched")):
             out.append("%s: пишем сами, а что искали — не сказано (searched)" % label)
         return out
+    if not text_of(c.get("choice")):
+        return out + ["%s: не назван выбор (choice)" % label]
     chosen = next((x for x in c.get("candidates") or [] if c.get("choice") in (x.get("repo"), x.get("name"))), None)
     if chosen is None:
         return out + ["%s: выбран %s, но его нет среди кандидатов" % (label, c.get("choice"))]
     out += scout_candidate_problems(label, decision, chosen)
     if c.get("paid") and not (text_of(c.get("byUser")) or c.get("asked")):
         out.append("%s: платное решает владелец — question add, затем поле asked с номером, или его слова в byUser" % label)
-    if c.get("core") and decision in ("adopt", "fork") and not text_of(c.get("byUser")):
+    if c.get("core") and decision in ("adopt", "adapt", "fork") and not text_of(c.get("byUser")):
         out.append("%s отличает продукт: брать готовым можно только словами владельца (byUser)" % label)
     if decision == "fork" and not text_of(c.get("byUser")):
         out.append("%s: чужой проект за основу — решение владельца (byUser)" % label)
-    if decision in ("adapt", "fork") and not (c.get("spike") or {}).get("result"):
+    if (decision in ("adapt", "fork") or (decision == "adopt" and c.get("risky"))) and not (c.get("spike") or {}).get("result"):
         out.append("%s: перед «%s» нужна проба (spike.result)" % (label, decision))
     return out
 
@@ -1266,6 +1273,7 @@ def arch_status(a):
     g = a.get("gate") or {}
     head = "архитектура принята: %s из 10%s" % (g.get("score"), " (с оговоркой владельца)" if g.get("waived") else "") \
         if g.get("ok") else "архитектура ещё не принята"
+    head += " · охват: " + ("весь проект" if a.get("scope") == "project" else "один прогон")
     return [head] + [arch_line(r) for r in a.get("rounds") or []]
 
 
@@ -1277,6 +1285,10 @@ def cmd_arch(pos, opt, multi=None):
         if a is not None:
             return ["аудит уже начат — " + arch_status(a)[0]]
         arch_write({"scope": scope, "startedAt": now(), "rounds": [], "gate": {"ok": False}})
+        state = read_state()
+        if scope == "project" and state and not state.get("finishedAt"):
+            state["programPlan"] = True
+            save(state)
         return ["архитектура: документ `.autopilot/architecture.md`, аудиты `.autopilot/architecture-audit/`"]
     if a is None:
         die("аудита ещё не было — arch start")
@@ -1320,10 +1332,14 @@ def ls_arch_ticket_problems(tickets):
     if not arch_accepted():
         return []
     return ["у таска %s нет поля Архитектура" % t["id"]
-            for t in tickets if t.get("type") != "prompt" and not t.get("architecture")]
+            for t in tickets if t.get("type") != "prompt" and not t.get("architecture")
+            and not re.match(r"^[FE]\d", t["id"])]
 
 
 def ls_arch_landing(state):
+    delta = (arch_read() or {}).get("delta")
+    if delta:
+        return ["GA: изменение архитектуры не прошло аудит — %s" % delta.get("note")]
     s = next((x for x in state.get("stages") or [] if x.get("id") == "architecture"), None)
     if s is None or s.get("status") == "skipped" or arch_accepted():
         return []
@@ -2339,9 +2355,20 @@ def questions_view(saved=None):
     stamp = date_of(now())
     q.update(key=re.sub(r"\W+", "-", str(saved.get("title") or "project")), listDateLabel=day_text(stamp),
              nextListLabel=saved.get("nextList") or "",
-             heroNote=saved.get("heroNote") or "Работа из-за этих вопросов не стоит.",
+             heroNote=questions_hero(q["open"]),
              manualNote=saved.get("manualNote") or "Это может сделать только ты: пароли, твои аккаунты, твоё разрешение.")
     return q
+
+
+def questions_hero(open_items):
+    """Шапка говорит правду о срочности, а не остаётся от прошлого списка."""
+    urgency = [x.get("urgency") or "" for x in open_items]
+    if any("Останавливает" in u for u in urgency):
+        return "Работа стоит, пока нет ответа."
+    launch = sum("Закрывает запуск" in u for u in urgency)
+    if launch:
+        return "Строить это не мешает, но без ответа нельзя выходить к людям: таких вопросов %d." % launch
+    return "Работа из-за этих вопросов не стоит."
 
 
 QUESTION_FIELDS = (("title", "о чём вопрос"), ("about", "контекст: откуда вопрос и почему важен"),
@@ -2450,26 +2477,25 @@ def page_json(data):
 def project_write():
     """Две страницы: ход проекта и вопросы. Данные внутри, поэтому открываются двойным кликом."""
     p = project_data()
-    if p is None:
-        return None
+    saved = json_read(PROJECT_STATE, {})
+    title = p["meta"]["title"] if p else saved.get("title") or (read_state() or {}).get("title") or "Проект"
     index, questions = project_template("project-template.html"), project_template("questions-template.html")
-    if index is None or questions is None:
+    if questions is None or (p and index is None):
         return ["! шаблонов страницы нет: нужен skillDir в state.js или .autopilot/project/templates/"]
-    q = questions_view({"title": p["meta"]["title"], **json_read(PROJECT_STATE, {})})
-    title = p["meta"]["title"]
+    q = dict(questions_view(dict(saved, title=title)), hasProject=bool(p))
     os.makedirs(PROJECT_DIR, exist_ok=True)
-    for name, tpl, data, heading in (("index.html", index, {"p": p, "q": q}, "%s: ход проекта" % title),
-                                     ("questions.html", questions, q, "%s: вопросы" % title)):
+    pages = [("questions.html", questions, q, "%s: вопросы" % title)]
+    if p:
+        pages.append(("index.html", index, {"p": p, "q": q}, "%s: ход проекта" % title))
+    for name, tpl, data, heading in pages:
         html = tpl.replace("__TITLE__", heading.replace("&", "&amp;").replace("<", "&lt;")).replace("__DATA__", page_json(data))
         with open(os.path.join(PROJECT_DIR, name), "w", encoding="utf-8") as f:
             f.write(html)
-    return ["! страница: " + x for x in page_lint(p) + page_lint({k: q[k] for k in ("open", "manual")})][:20]
+    return ["! страница: " + x for x in page_lint(p or {}) + page_lint({k: q[k] for k in ("open", "manual")})][:20]
 
 
 def project_refresh():
-    """Страница не отстаёт от работы: пересобирается сама, если у проекта есть программа."""
-    if not os.path.isfile(PROGRAM):
-        return []
+    """Страница не отстаёт от работы: пересобирается сама."""
     return project_write() or []
 
 
@@ -2515,8 +2541,8 @@ def cmd_project(pos, opt, multi=None):
         project_save_text(saved, pos, opt, multi)
         json_write(PROJECT_STATE, saved)
     notes = project_write()
-    if notes is None:
-        die("у проекта нет программы — .autopilot/program.md пишется по phases/0-program.md")
+    if not os.path.isfile(os.path.join(PROJECT_DIR, "index.html")):
+        return ["программы нет, поэтому собрана только страница вопросов: .autopilot/project/questions.html"] + notes
     url = json_read(PROJECT_STATE, {}).get("url")
     if lint_only:
         return notes or ["на странице чисто"]
@@ -2574,6 +2600,9 @@ def cmd_init(opt):
     if isinstance(opt.get("program"), str):
         state["program"] = opt["program"]
         notes.append(program_set(opt["program"], "in-flight", d=state["dir"], started=state["startedAt"][:10]))
+        saved = json_read(PROJECT_STATE, None)
+        if saved and saved.pop("now", None) is not None:   # прошлый прогон сдан: его слова больше не правда
+            json_write(PROJECT_STATE, saved)
     save(state)
     ensure_gitignore()
     register_row(state, "в работе", None)
@@ -3006,7 +3035,7 @@ def main():
     save(state)
     write_board(state)
     snap = write_snapshot(state)
-    if state.get("program") and cmd in ("init", "tickets", "ticket", "stage", "tests", "finish", "reopen"):
+    if os.path.isfile(PROGRAM) and state.get("program") and cmd in ("init", "tickets", "ticket", "stage", "tests", "finish", "reopen"):
         notes += project_refresh()
     if cmd == "finish" or opt.get("stop"):
         srv = stop_later()

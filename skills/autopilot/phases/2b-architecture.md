@@ -6,7 +6,7 @@ An architect designs. A critic who has never met the architect scores the design
 
 ## 1. Size first — does this need it, and is it one run at all?
 
-One line to yourself, from the brief and the briefing: «~N тысяч строк: …», by the table in `phases/4-plan.md`. Then:
+Phase 2a sized the work (`phases/2a-scout.md` §0). If it was skipped, size it now the same way. Then:
 
 | Estimate | Route |
 |---|---|
@@ -18,7 +18,7 @@ One line to yourself, from the brief and the briefing: «~N тысяч стро�
 
 ## 2. Existing code goes first
 
-When Phase 0 found code, run the exploring subagent described at the top of `phases/3-spec.md` **now**, and hand its `notes.md` to both agents. Phase 3 does not repeat it.
+Both agents get `notes.md` (`phases/2a-scout.md` §0). Phase 2a was skipped and Phase 0 found code — run that exploring subagent now.
 
 ## 3. The loop
 
@@ -59,7 +59,7 @@ python3 .autopilot/ap.py question add --title "…" --about "…" --agrees "…"
 
 **You** carry them over from section 18; the architect reads `.autopilot/project/questions.json` so it does not ask twice. A question that does not stop building but blocks going live carries the urgency «Закрывает запуск» and is named again in every report until it is answered.
 
-- `semi`, `interview`, `manual`: ask before the next round when the answer changes the design. A question that does not change it waits for the next list.
+- `semi`, `interview`, `manual`: ask before the next round when the answer changes the design — `ap.py ask briefing --note "…"` and the text of `ap.py question list` in the chat. A question that does not change it waits for the next list.
 - `full`: the recommendation is taken, recorded as an `ASSUMPTION` row, and listed in the report.
 
 **At the ceiling, in every mode**: `ap.py ask stop --note "…"`; say what is missing in plain words, what you recommend, and what going ahead would risk. Only on their answer: `ap.py arch waive --by-user "<их слова>"`. The page then shows the real score and «принято с оговоркой», never a nine.
@@ -73,7 +73,7 @@ An accepted architecture is a contract, like the manifest:
 - **Executors** read those sections after `interfaces.md`. A conflict is `BLOCKED`, never a quiet workaround (`prompts/executor.md`).
 - **The whole-branch review** checks conformance (`phases/6-review.md`).
 
-**Commit it now** — the design outlives this session: `git add -A -- .autopilot && git commit -qm "Autopilot: архитектура принята" --trailer "Autopilot-Run: <папка>" -- .autopilot`.
+**Commit it now**, after the secrets and personal-data scan over `.autopilot/` (`phases/1-manifest.md`) — the design outlives this session: `git add -A -- .autopilot && git commit -qm "Autopilot: архитектура принята" --trailer "Autopilot-Run: <папка>" -- .autopilot`.
 
 ## 6. Changing an accepted architecture
 
