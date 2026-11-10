@@ -1,3 +1,5 @@
+> **Это `autopilot-ls`**, форк Autopilot для проектов на много недель, которые идут почти без участия человека: поиск готового, архитектура с аудитом до 9 из 10, мастер-план с гантом, единый отчёт по всему проекту и страница решений владельца. Отличия и установка: [CHANGES-ls.md](CHANGES-ls.md). Запуск: `/autopilot-ls`. Дальше в этом файле описан исходный Autopilot.
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/autopilot-logo-dark.png">

@@ -1340,5 +1340,237 @@ class Scout(Base):
         self.assertIn("не обновлялся", out)
 
 
+PROGRAM_V2 = """# Программа — Запись к мастеру
+
+Параллельно: 1
+
+| ID | Прогон | Зависит от | Статус | Папка | Итог | Тасков | Дней | Простыми словами | Что это даёт | Начат | Сдан |
+|----|--------|------------|--------|-------|------|--------|------|------------------|--------------|-------|------|
+| P01 | Ядро | — | landed | `2026-11-02-core` | есть | 8 | 3 | Ядро расписания | Записи хранятся | 2026-11-02 | 2026-11-05 |
+| P02 | Канал | P01 | pending | — | — | 6 | 2 | Бот | Клиент пишет боту | — | — |
+| P03 | Оплата | P02 | pending | — | — | 6 | 4 | Оплата | Клиент платит | — | — |
+
+| ID | Момент | После | Что станет можно |
+|----|--------|-------|------------------|
+| M1 | Первая запись | P02 | Записать клиента |
+"""
+
+
+class Project(Base):
+    """Мастер-план, страница проекта, вопросы владельцу."""
+
+    QUESTION = ("question", "add", "--title", "Сколько хранить", "--about", "Контекст", "--agrees", "Два года",
+                "--recommend", "Два года.", "--why", "Хватит", "--silence", "Без срока")
+
+    def program(self, text=PROGRAM_V2, briefs=("P01", "P02", "P03")):
+        with open(os.path.join(self.a, "program.md"), "w", encoding="utf-8") as f:
+            f.write(text)
+        os.makedirs(os.path.join(self.a, "briefs"), exist_ok=True)
+        for p in briefs:
+            with open(os.path.join(self.a, "briefs", p + ".md"), "w", encoding="utf-8") as f:
+                f.write("бриф\n")
+
+    def page(self, name="index.html"):
+        return read(os.path.join(self.a, "project", name))
+
+    def page_data(self, name="index.html"):
+        m = re.search(r'<script id="data" type="application/json">(.*?)</script>', self.page(name), re.S)
+        return json.loads(m.group(1))
+
+    def accept_architecture(self):
+        audit = {k: {"score": 9.5, "evidence": "§", "gap": ""} for k, _, _, _ in self.module().ARCH_CRITERIA}
+        body = {"criteria": audit, "findings": [], "summary": "Итог",
+                "scenarios": [{"name": "s%d" % i, "verdict": "проходит"} for i in range(5)]}
+        os.makedirs(os.path.join(self.a, "architecture-audit"), exist_ok=True)
+        self.ap("arch", "start", "--scope", "project")
+        for n, kind in ((1, "audit"), (2, "confirm")):
+            with open(os.path.join(self.a, "architecture-audit", "%02d.json" % n), "w", encoding="utf-8") as f:
+                json.dump(body, f, ensure_ascii=False)
+            code, out = self.ap("arch", "round", "--file", ".autopilot/architecture-audit/%02d.json" % n, "--kind", kind)
+            self.assertEqual(code, 0, out)
+
+    def module(self):
+        spec = importlib.util.spec_from_file_location("ap_project", os.path.join(self.a, "ap.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        return m
+
+    def test_a_clean_master_plan_passes(self):
+        self.program()
+        code, out = self.ap("program", "check")
+        self.assertIn("мастер-план сходится: прогонов 3", out)
+
+    def test_the_plan_needs_sizes_words_and_a_brief_for_every_run(self):
+        self.program(PROGRAM_V2.replace("| 6 | 2 | Бот | Клиент пишет боту |", "| — | — | — | — |"), briefs=("P01", "P03"))
+        out = self.ap("program", "check")[1]
+        self.assertIn("P02: не заполнено — Тасков, Дней, Простыми словами, Что даёт", out)
+        self.assertIn("P02: нет брифа", out)
+
+    def test_a_run_depends_only_on_rows_above_it(self):
+        self.program(PROGRAM_V2.replace("| P02 | Канал | P01 |", "| P02 | Канал | P03 |"))
+        self.assertIn("P02 зависит от P03", self.ap("program", "check")[1])
+
+    def test_every_live_requirement_goes_to_a_run(self):
+        self.program()
+        self.init()
+        self.write("manifest.md", MANIFEST.replace("| spec §2 |", "| P02 |").replace("| spec §4 |", "| P03 |"))
+        out = self.ap("program", "check")[1]
+        self.assertIn("R05", out)
+        self.assertNotIn("R01", out)
+        self.assertNotIn("R03", out)                       # снято владельцем — прогон не нужен
+
+    def test_schedule_uses_facts_dependencies_and_lanes(self):
+        m = self.module()
+        d = m.dt.date
+        rows = m.program_rows(PROGRAM_V2.splitlines())
+        s = m.program_schedule(rows, d(2026, 11, 10), 1)
+        self.assertEqual(s["P01"], (d(2026, 11, 2), d(2026, 11, 5)))
+        self.assertEqual(s["P02"], (d(2026, 11, 10), d(2026, 11, 11)))
+        self.assertEqual(s["P03"], (d(2026, 11, 12), d(2026, 11, 15)))
+
+    def test_two_lanes_run_independent_work_side_by_side(self):
+        m = self.module()
+        d = m.dt.date
+        rows = m.program_rows(PROGRAM_V2.replace("| P03 | Оплата | P02 |", "| P03 | Оплата | P01 |").splitlines())
+        s = m.program_schedule(rows, d(2026, 11, 10), 2)
+        self.assertEqual(s["P03"][0], d(2026, 11, 10))
+
+    def test_a_run_writes_its_dates_and_real_size(self):
+        self.program()
+        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--program", "P02")
+        self.dir = os.path.join(self.a, self.state()["dir"])
+        self.write("manifest.md", MANIFEST)
+        self.write("tickets/01-a.md", ticket("01", "Первый", "R01, R02, R05", "—", ["src/a/"], 1))
+        self.ap("tickets")
+        row = next(x for x in read(os.path.join(self.a, "program.md")).splitlines() if x.startswith("| P02"))
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        self.assertEqual((cells[3], cells[6]), ("in-flight", "1"))
+        self.assertRegex(cells[10], r"\d{4}-\d\d-\d\d")
+
+    def test_the_old_six_column_program_still_works(self):
+        with open(os.path.join(self.a, "program.md"), "w", encoding="utf-8") as f:
+            f.write("| ID | Прогон | Зависит от | Статус | Папка | Итог |\n|--|--|--|--|--|--|\n| P01 | Ядро | — | pending | — | — |\n")
+        self.ap("init", "--slug", "c", "--title", "Б", "--skill-dir", SKILL, "--program", "P01")
+        row = next(x for x in read(os.path.join(self.a, "program.md")).splitlines() if x.startswith("| P01"))
+        self.assertEqual(row.count("|"), 7)
+
+    def test_the_plan_lands_without_code(self):
+        self.program()
+        self.init()
+        self.write("manifest.md", MANIFEST.replace("| spec §2 |", "| P02 |").replace("| spec §4 |", "| P03 |").replace("| spec §6 |", "| P03 |"))
+        self.accept_architecture()
+        code, out = self.ap("program", "plan", "--result", "3 прогона, запись к мастеру")
+        self.assertEqual(code, 0, out)
+        s = self.state()
+        self.assertTrue(s["finishedAt"])
+        self.assertEqual(self.stage("build")["status"], "skipped")
+        self.assertFalse(s["dir"].endswith("--wip"))
+        self.assertIn("план программы", read(os.path.join(self.a, "README.md")))
+        self.assertIn("следующий: P02", self.ap("program")[1])
+
+    def test_the_plan_waits_for_the_architecture(self):
+        self.program()
+        self.init()
+        self.write("manifest.md", MANIFEST.replace("| spec §2 |", "| P02 |").replace("| spec §4 |", "| P03 |").replace("| spec §6 |", "| P03 |"))
+        code, out = self.ap("program", "plan", "--result", "x")
+        self.assertNotEqual(code, 0)
+        self.assertIn("архитектура проекта не принята", out)
+
+    def test_the_page_counts_the_whole_project(self):
+        self.program()
+        self.init()
+        code, out = self.ap("project")
+        self.assertEqual(code, 0, out)
+        d = self.page_data()
+        self.assertEqual((d["p"]["progress"]["done"], d["p"]["progress"]["total"]), (8, 20))
+        self.assertEqual(d["p"]["progress"]["percent"], 40)
+        self.assertEqual([r["status"] for r in d["p"]["runs"]], ["landed", "next", "pending"])
+        kinds = [(r["group"], r["kind"]) for r in d["p"]["gantt"]["rows"]]
+        self.assertEqual(kinds[0], ("done", "done"))
+        self.assertIn(("milestone", "milestone"), kinds)
+
+    def test_a_page_carries_its_data_and_opens_from_disk(self):
+        self.program()
+        self.init()
+        self.ap("project")
+        for name in ("index.html", "questions.html"):
+            page = self.page(name)
+            self.assertNotIn("__DATA__", page)
+            self.assertNotIn("__TITLE__", page)
+            self.assertNotIn("fetch(", page)
+            self.assertIn('charset="utf-8"', page)
+
+    def test_the_page_follows_the_work(self):
+        self.program()
+        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--program", "P02")
+        self.dir = os.path.join(self.a, self.state()["dir"])
+        self.write("manifest.md", MANIFEST)
+        self.write("tickets/01-a.md", ticket("01", "Первый", "R01, R02, R05", "—", ["src/a/"], 1))
+        self.ap("tickets")
+        self.ap("ticket", "01", "start")
+        self.assertEqual(self.page_data()["p"]["currentRun"]["plan"][0]["tickets"][0]["k"], "now")
+
+    def test_a_question_must_stand_on_its_own(self):
+        code, out = self.ap("question", "add", "--title", "Только заголовок")
+        self.assertNotEqual(code, 0)
+        self.assertIn("рекомендация", out)
+        self.assertIn("если промолчит", out)
+
+    def test_an_answer_moves_the_question_and_numbers_are_never_reused(self):
+        self.program()
+        self.init()
+        self.ap(*self.QUESTION)
+        self.ap("question", "answer", "1", "--by-user", "«ок»")
+        code, out = self.ap(*self.QUESTION)
+        q = self.page_data("questions.html")
+        self.assertEqual([x["id"] for x in q["open"]], [2])
+        self.assertEqual(q["resolved"][0]["answer"], "«ок»")
+
+    def test_only_the_owners_words_close_a_question(self):
+        self.program()
+        self.init()
+        self.ap(*self.QUESTION)
+        self.assertNotEqual(self.ap("question", "answer", "1")[0], 0)
+
+    def test_the_digest_can_be_answered_without_opening_anything(self):
+        self.ap(*self.QUESTION)
+        out = self.ap("question", "list")[1]
+        for piece in ("Сколько хранить", "О чём: Контекст", "На что соглашаешься: Два года", "Совет: Два года.", "Если промолчишь: Без срока", "«1 ок»"):
+            self.assertIn(piece, out)
+
+    def test_a_manual_action_says_why_only_the_owner_can(self):
+        self.assertNotEqual(self.ap("manual", "add", "k", "--title", "Договор")[0], 0)
+        code, out = self.ap("manual", "add", "k", "--title", "Договор", "--only-you", "подпись", "--why", "нужно", "--step", "подпиши")
+        self.assertEqual(code, 0, out)
+
+    def test_lint_catches_what_the_owner_should_not_read(self):
+        self.program()
+        self.init()
+        self.ap("question", "add", "--title", "Закрыть R07 в ветке main", "--about", "см. /Users/me/x", "--agrees", "a",
+                "--recommend", "b", "--why", "c", "--silence", "d")
+        out = self.ap("project", "lint")[1]
+        self.assertIn("код требования", out)
+        self.assertIn("слово разработчика", out)
+        self.assertIn("путь на диске", out)
+
+    def test_lint_is_quiet_on_plain_words(self):
+        self.program()
+        self.init()
+        self.assertIn("на странице чисто", self.ap("project", "lint")[1])
+
+    def test_the_architecture_and_the_ready_made_parts_reach_the_page(self):
+        self.program()
+        self.init()
+        self.accept_architecture()
+        with open(os.path.join(self.a, "prior-art.json"), "w", encoding="utf-8") as f:
+            json.dump({"capabilities": [{"id": "C1", "name": "Канал", "decision": "adopt", "why": "зрелая", "choice": "a/b"},
+                                        {"id": "C2", "name": "Правила", "decision": "build", "why": "наш продукт"}]}, f, ensure_ascii=False)
+        self.ap("project")
+        d = self.page_data()["p"]
+        self.assertTrue(d["arch"]["ok"])
+        self.assertEqual(d["arch"]["score"], 9.5)
+        self.assertEqual(([x["name"] for x in d["reuse"]["taken"]], [x["name"] for x in d["reuse"]["own"]]), (["Канал"], ["Правила"]))
+
+
 if __name__ == "__main__":
     unittest.main()

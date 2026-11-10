@@ -31,6 +31,15 @@
     python3 .autopilot/ap.py commits                    # коммиты сданных тасков ещё в истории?
     python3 .autopilot/ap.py                            # просто синхронизировать
 
+Форк autopilot-ls, команды всего проекта (state.js им не нужен):
+
+    python3 .autopilot/ap.py scout verify | check       # гейт GS: что брать готовым
+    python3 .autopilot/ap.py arch start | round --file F [--kind confirm|delta|as-built] | status | delta | waive
+    python3 .autopilot/ap.py program [check | plan --result "…" | P05 block --note "…" | P05 pending]
+    python3 .autopilot/ap.py project [now | change | spend | next-list | url | run | lint]
+    python3 .autopilot/ap.py question add | answer N --by-user "…" | list
+    python3 .autopilot/ap.py manual add KEY | done KEY --by-user "…"
+
 После каждой команды: updatedAt = сейчас (и метка в журнале beats), строка в ленте log,
 счётчики и список требований — из manifest.md, гейты G1–G4 — из событий, которые их решают,
 пройденные этапы закрыты, снимок вписан в dashboard.html, сервер жив. Время
@@ -45,6 +54,7 @@ import glob
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import sys
@@ -676,7 +686,7 @@ def cmd_e2e(state, pos, multi):
 # ── форк autopilot-ls: программа прогонов (phases/0-program.md) ────────────
 
 PROGRAM = os.path.join(A, "program.md")
-PROGRAM_ROW = re.compile(r"^\|\s*P\d+\s*\|")
+PROGRAM_ROW = re.compile(r"^\|\s*P\d+[a-z]?\s*\|")
 
 
 def program_lines():
@@ -686,18 +696,30 @@ def program_lines():
         return None
 
 
+def int_of(cell):
+    m = re.search(r"\d+", cell)
+    return int(m.group()) if m else None
+
+
+def blank(cell):
+    return "" if cell in ("", "—", "-") else cell
+
+
 def program_rows(lines):
     rows = []
     for i, line in enumerate(lines):
         if PROGRAM_ROW.match(line):
-            c = [x.strip() for x in cells_of(line)] + [""] * 6
-            rows.append({"i": i, "id": c[0], "title": c[1], "deps": re.findall(r"P\d+", c[2]),
-                         "status": c[3], "dir": c[4].strip("`"), "result": c[5]})
+            got = [x.strip() for x in cells_of(line)]
+            c = got + [""] * 12
+            rows.append({"i": i, "n": len(got), "id": c[0], "title": c[1], "deps": re.findall(r"P\d+[a-z]?", c[2]),
+                         "status": c[3], "dir": c[4].strip("`"), "result": c[5],
+                         "tickets": int_of(c[6]), "days": int_of(c[7]), "plain": blank(c[8]), "gives": blank(c[9]),
+                         "started": blank(c[10]), "landed": blank(c[11])})
     return rows
 
 
-def program_set(pid, status, d=None, result=None):
-    """Строка программы меняется только здесь: статус, папка прогона, итог."""
+def program_set(pid, status, d=None, result=None, **plan):
+    """Строка программы меняется только здесь: статус, папка, итог, факт дат и число тасков."""
     lines = program_lines()
     if lines is None:
         return "! программы нет — .autopilot/program.md"
@@ -705,16 +727,24 @@ def program_set(pid, status, d=None, result=None):
     if not hit:
         return "! в программе нет %s" % pid
     r = hit[0]
-    lines[r["i"]] = "| %s | %s | %s | %s | %s | %s |" % (
-        r["id"], r["title"], ", ".join(r["deps"]) or "—", status,
-        "`%s`" % d if d else (("`%s`" % r["dir"]) if r["dir"] not in ("", "—") else "—"),
-        result or r["result"] or "—")
+    cells = [r["id"], r["title"], ", ".join(r["deps"]) or "—", status,
+             "`%s`" % d if d else (("`%s`" % r["dir"]) if r["dir"] not in ("", "—") else "—"),
+             result or r["result"] or "—"]
+    if r["n"] > 6:
+        r.update(plan)
+        cells += [str(r[k]) if r[k] else "—" for k in ("tickets", "days", "plain", "gives", "started", "landed")]
+    lines[r["i"]] = "| " + " | ".join(cells) + " |"
     with open(PROGRAM, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     return "программа: %s → %s" % (pid, status)
 
 
-def cmd_program(pos, opt):
+def cmd_program(pos, opt, multi=None):
+    if pos[:1] == ["plan"]:
+        return cmd_program_plan(opt)
+    if pos[:1] == ["check"]:
+        problems = program_problems(read_state())
+        return ["! " + p for p in problems] or ["мастер-план сходится: прогонов %d" % len(program_rows(program_lines()))]
     lines = program_lines()
     if lines is None:
         die("программы нет — .autopilot/program.md пишется по phases/0-program.md")
@@ -926,7 +956,7 @@ def scout_counts(data):
     return {"capabilities": len(caps), "taken": len(taken), "own": len(caps) - len(taken)}
 
 
-def cmd_scout(pos, opt):
+def cmd_scout(pos, opt, multi=None):
     act = pos[0] if pos else "status"
     data = scout_read()
     if data is None:
@@ -1233,7 +1263,7 @@ def arch_status(a):
     return [head] + [arch_line(r) for r in a.get("rounds") or []]
 
 
-def cmd_arch(pos, opt):
+def cmd_arch(pos, opt, multi=None):
     act = pos[0] if pos else "status"
     a = arch_read()
     if act == "start":
@@ -1851,6 +1881,647 @@ def ensure_gitignore():
         f.write(("" if not text or text.endswith("\n") else "\n") + ".autopilot/serve.*\n")
 
 
+# ── форк autopilot-ls: мастер-план и страница всего проекта (phases/0-program.md) ──
+
+PROJECT_DIR = os.path.join(A, "project")
+PROJECT_STATE = os.path.join(PROJECT_DIR, "state.json")
+QUESTIONS = os.path.join(PROJECT_DIR, "questions.json")
+BRIEFS = os.path.join(A, "briefs")
+MILESTONE_ROW = re.compile(r"^\|\s*M\d+\s*\|")
+PROGRAM_DEFAULT_TICKETS = 8
+PROGRAM_DEFAULT_DAYS = 3
+MONTHS = ("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа",
+          "сентября", "октября", "ноября", "декабря")
+RU_STAGE = {"preflight": "Подготовка", "manifest": "Требования", "briefing": "Брифинг", "scout": "Поиск готового",
+            "architecture": "Архитектура", "spec": "Спецификация", "plan": "План", "build": "Разработка",
+            "review": "Код-ревью", "final": "Приёмка"}
+GLOSSARY = [
+    ["Прогон", "Большой кусок проекта со своей задачей, планом и приёмкой. Проект собирается из нескольких прогонов.", "прогон"],
+    ["Таск", "Один кусок работы внутри прогона. Его делает отдельный исполнитель.", "таск"],
+    ["Волна", "Таски, которые можно делать одновременно. Следующая волна начинается после предыдущей.", "волн"],
+    ["Архитектура", "Как продукт устроен внутри: из каких частей, как они связаны и что будет при сбоях.", "архитектур"],
+    ["Оркестратор", "Главный чат, который ведёт разработку и раздаёт работу исполнителям.", "оркестратор"],
+]
+LINT_KEYS_SKIP = {"id", "run", "start", "end", "at", "asOf", "tz", "key", "url", "listDate", "kind", "group",
+                  "status", "state", "file", "choice", "repo"}
+PAGE_LINT = (
+    (re.compile(r"\b[RGAD]\d{2}(?:\.\d+)?\b"), "код требования"),
+    (re.compile(r"\b[TP]\d{2}[a-z]?\b"), "внутренний номер"),
+    (re.compile(r"\b(?:main|master|worktree|rebase|fast-forward|git push|git merge)\b", re.I), "слово разработчика"),
+    (re.compile(r"/Users/|/home/|[A-Za-z]:\\\\"), "путь на диске"),
+    (re.compile(r"sk-[A-Za-z0-9_-]{12,}|ghp_[A-Za-z0-9]{20,}|\b\d{8,10}:[A-Za-z0-9_-]{30,}|AKIA[0-9A-Z]{12,}"), "похоже на секрет"),
+    (re.compile(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"), "адрес сервера"),
+)
+
+
+def json_read(path, default):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def json_write(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+
+def date_of(v):
+    try:
+        return dt.date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
+
+
+def day_text(d):
+    return "%d %s" % (d.day, MONTHS[d.month - 1])
+
+
+def span_text(a, b):
+    if a == b:
+        return day_text(a)
+    if (a.year, a.month) == (b.year, b.month):
+        return "%d–%d %s" % (a.day, b.day, MONTHS[a.month - 1])
+    return "%s – %s" % (day_text(a), day_text(b))
+
+
+def plural_ru(n, one, few, many):
+    tail, tens = n % 10, n % 100
+    if tail == 1 and tens != 11:
+        return one
+    return few if 2 <= tail <= 4 and not 12 <= tens <= 14 else many
+
+
+def next_runnable(rows):
+    landed = {r["id"] for r in rows if r["status"] == "landed"}
+    return next((r for r in rows if r["status"] == "pending" and all(d in landed for d in r["deps"])), None)
+
+
+def program_parallel(lines):
+    m = next((re.search(r"Параллельно[^0-9]*(\d+)", x) for x in lines if x.startswith("Параллельно")), None)
+    return max(1, int(m.group(1))) if m else 1
+
+
+def program_milestones(lines):
+    out = []
+    for line in lines:
+        if MILESTONE_ROW.match(line):
+            c = [x.strip() for x in cells_of(line)] + [""] * 4
+            out.append({"id": c[0], "title": c[1], "after": re.findall(r"P\d+[a-z]?", c[2]), "gives": c[3]})
+    return out
+
+
+def program_schedule(rows, today, parallel):
+    """Даты для диаграммы: сданное — по факту, остальное — оценка из дней, зависимостей и дорожек."""
+    lanes, ends, out = [today] * parallel, {}, {}
+    day = dt.timedelta(days=1)
+    for r in rows:
+        days = max(1, r["days"] or PROGRAM_DEFAULT_DAYS)
+        if r["status"] == "landed":
+            end = date_of(r["landed"]) or today
+            out[r["id"]], ends[r["id"]] = (date_of(r["started"]) or end, end), end
+            continue
+        lane = lanes.index(min(lanes))
+        if r["status"] == "in-flight":
+            start = date_of(r["started"]) or today
+            end = max(start + day * (days - 1), today)
+        else:
+            start = max([lanes[lane]] + [ends[d] + day for d in r["deps"] if d in ends])
+            end = start + day * (days - 1)
+        lanes[lane], out[r["id"]], ends[r["id"]] = end + day, (start, end), end
+    return out
+
+
+def program_problems(state=None):
+    """Мастер-план записан целиком: у каждого прогона размер, срок, слова для владельца, свой бриф."""
+    lines = program_lines()
+    if lines is None:
+        return ["нет .autopilot/program.md"]
+    rows = program_rows(lines)
+    if not rows:
+        return ["в программе нет ни одного прогона"]
+    out, seen = [], set()
+    for r in rows:
+        if r["id"] in seen:
+            out.append("%s встречается дважды" % r["id"])
+        out += ["%s зависит от %s, а он ниже по таблице или его нет" % (r["id"], d) for d in r["deps"] if d not in seen]
+        seen.add(r["id"])
+        missing = [n for n, k in (("Тасков", "tickets"), ("Дней", "days"), ("Простыми словами", "plain"), ("Что даёт", "gives"))
+                   if not r[k]]
+        if missing:
+            out.append("%s: не заполнено — %s" % (r["id"], ", ".join(missing)))
+        if not os.path.isfile(os.path.join(BRIEFS, r["id"] + ".md")):
+            out.append("%s: нет брифа .autopilot/briefs/%s.md" % (r["id"], r["id"]))
+    return out + program_manifest_problems(state, seen)
+
+
+def program_manifest_problems(state, ids):
+    """Ни одно живое требование не осталось без прогона: колонка «Где» называет P##."""
+    if not state or not state.get("dir") or state.get("program"):
+        return []
+    out = []
+    for r in manifest_where(state):
+        if r["status"] not in ("dropped", "deferred") and not set(re.findall(r"P\d+[a-z]?", r["where"])) & ids:
+            out.append("требование %s не попало ни в один прогон (колонка «Где»)" % r["id"])
+    return out
+
+
+def manifest_where(state):
+    try:
+        text = open(os.path.join(run_dir(state), "manifest.md"), encoding="utf-8").read()
+    except OSError:
+        return []
+    rows = []
+    for line in text.splitlines():
+        c = [x.strip() for x in cells_of(line)] if line.lstrip().startswith("|") else []
+        if len(c) >= 5 and ROW_ID.match(c[0].strip("`*")) and not c[0].startswith("D"):
+            rows.append({"id": c[0].strip("`*"), "status": c[2], "where": c[4]})
+    return rows
+
+
+def cmd_program_plan(opt):
+    """План программы записан — прогон планирования закрывается без кода, на его месте остаётся план."""
+    state = read_state()
+    if state is None or state.get("finishedAt"):
+        die("закрыть план программы можно только из идущего прогона планирования")
+    if not isinstance(opt.get("result"), str):
+        die("program plan --result \"сколько прогонов и что в итоге будет\"")
+    problems = program_problems(state)
+    if not arch_accepted():
+        problems.append("архитектура проекта не принята: arch status")
+    if problems:
+        die("план программы не закрыт:\n  ! " + "\n  ! ".join(problems))
+    state["updatedAt"] = t = now()
+    beat(state)
+    for s in state.get("stages") or []:
+        if s.get("status") in ("pending", "active") and s.get("id") in ("spec", "plan", "build", "review", "final"):
+            s.update(status="skipped", note="это план программы: код строят её прогоны", finishedAt=t)
+            s.setdefault("startedAt", t)
+    state["programPlan"] = True
+    notes = land_run(state, opt["result"], [], None, "план программы")
+    save(state)
+    write_snapshot(state)
+    stop_later()
+    return notes + project_refresh()
+
+
+def load_state_file(path):
+    try:
+        raw = open(path, encoding="utf-8").read()
+        return json.loads(raw.split("=", 1)[1].strip().rstrip(";"))
+    except (OSError, ValueError, IndexError):
+        return None
+
+
+def run_states(rows):
+    """Состояние каждого прогона: живой — из state.js, сданные — из их папок."""
+    live = read_state()
+    out = {}
+    for r in rows:
+        if live and live.get("program") == r["id"]:
+            out[r["id"]] = live
+        elif r["dir"] and r["dir"] != "—":
+            found = load_state_file(os.path.join(A, r["dir"], "state.js"))
+            if found:
+                out[r["id"]] = found
+    return out
+
+
+def brief_text(st):
+    files = sorted(glob.glob(os.path.join(A, st.get("dir") or "", "*-brief.md")))
+    if not files:
+        return ""
+    body = open(files[0], encoding="utf-8").read().split("## Дополнения")[0]
+    lines = [x.strip() for x in body.splitlines() if x.strip() and not x.startswith(("#", ">"))]
+    text = " ".join(lines)
+    return text if len(text) <= 500 else text[:499].rstrip() + "…"
+
+
+def ticket_minutes(t):
+    a, b = t.get("startedAt"), t.get("finishedAt")
+    if not a or not b:
+        return None
+    return max(1, round((dt.datetime.fromisoformat(b) - dt.datetime.fromisoformat(a)).total_seconds() / 60))
+
+
+def run_plan(st):
+    """План прогона по волнам — диаграмма внутри отчёта."""
+    bucket = {"done": "done", "in-progress": "now", "repair": "now", "review": "rev",
+              "awaiting_owner": "rev", "failed": "bad"}
+    waves = {}
+    for t in st.get("tickets") or []:
+        waves.setdefault(t.get("wave") or 1, []).append(
+            {"title": t.get("title") or t["id"], "k": bucket.get(t.get("status"), "wait"), "minutes": ticket_minutes(t)})
+    return [{"n": k, "tickets": waves[k]} for k in sorted(waves)]
+
+
+def run_checks(st):
+    g, out = st.get("gates") or {}, []
+    tests = st.get("tests")
+    if tests:
+        out.append({"t": "Автотесты", "v": "прошло %d, упало %d" % (tests["passed"], tests["failed"]),
+                    "s": "Программа сама проверяет, что написанное работает.", "ok": not tests["failed"]})
+    rows = (
+        ("GS", "Поиск готового", lambda x: "частей %s, взято готовым %s" % (x.get("capabilities"), x.get("taken")),
+         "Что брать готовым, решено по каждой части, лицензии проверены."),
+        ("GA", "Архитектура", lambda x: "%s из 10" % x.get("score"),
+         "Независимый критик оценил устройство продукта по длинному списку требований."),
+        ("G1", "Ни одно требование не потеряно", lambda x: "разобрано %s" % x.get("total"),
+         "Каждая твоя фраза стала строкой списка и дошла до конца."),
+        ("G2", "Сверка описания с твоей задачей", lambda x: "найдено %s, исправлено %s" % (x.get("found"), x.get("fixed")),
+         "Отдельный проверяющий читал только твою задачу и описание будущей работы."),
+        ("G3", "Каждое требование попало в работу", lambda x: "проблем: %s" % (x.get("problems") or 0),
+         "Ни одно требование не осталось без куска работы."),
+        ("G4", "Слепая приёмка", lambda x: "совпало %s из %s" % (x.get("matched"), x.get("checked")),
+         "Проверяющий не видел нашей документации и сверял готовое с твоей задачей."),
+    )
+    for key, title, value, meaning in rows:
+        if key in g:
+            out.append({"t": title, "v": value(g[key]), "s": meaning, "ok": bool(g[key].get("ok"))})
+    return out
+
+
+def run_report(r, st):
+    stage_state = {"done": "done", "active": "active", "skipped": "skipped", "failed": "active"}
+    stages = [{"name": RU_STAGE.get(s["id"], s["id"]), "state": stage_state.get(s.get("status"), "pending"),
+               "note": s.get("note") if s.get("status") == "skipped" else None}
+              for s in st.get("stages") or [] if s.get("id") in RU_STAGE]
+    tickets = st.get("tickets") or []
+    done = sum(1 for t in tickets if t.get("status") == "done")
+    req = st.get("requirements") or {}
+    in_work = sum(req.get(k, 0) for k in ("inTicket", "inSpec", "placeholder"))
+    awaiting = sum(1 for t in tickets if t.get("status") == "awaiting_owner")
+    not_done = ["%s — %s" % (x["text"], x["why"]) if x.get("why") else x["text"]
+                for x in st.get("reqList") or [] if x.get("status") in ("deferred", "dropped")]
+    start = date_of(st.get("startedAt"))
+    end = date_of(st.get("finishedAt"))
+    return {"id": r["id"], "name": r["plain"] or r["title"], "plain": r["gives"],
+            "statusLabel": "Сдан" if st.get("finishedAt") else "Идёт",
+            "dates": (span_text(start, end) if end else "начат %s" % day_text(start)) if start else "",
+            "brief": brief_text(st), "stages": stages,
+            "tasks": {"done": done, "total": len(tickets),
+                      "note": ("%d ждут твоего взгляда" % awaiting) if awaiting else ""},
+            "requirements": "Требований %d: готово %d, в работе %d, отложено %d"
+                            % (req.get("total", 0), req.get("done", 0), in_work, req.get("deferred", 0)),
+            "reqBar": {"done": req.get("done", 0), "prog": in_work, "later": req.get("deferred", 0)},
+            "checks": run_checks(st), "assumptions": (st.get("debt") or {}).get("assumptions") or [],
+            "notDone": not_done + (st.get("report") or []), "plan": run_plan(st), "nowDoing": ""}
+
+
+def project_arch():
+    a = arch_read()
+    if not a or not a.get("rounds"):
+        return None
+    gated = [r for r in a["rounds"] if r.get("kind") != "as-built"]
+    last = gated[-1] if gated else a["rounds"][-1]
+    g = a.get("gate") or {}
+    audit = json_read(os.path.join(ROOT, last["file"]), {})
+    crit = audit.get("criteria") or {}
+    names = [(n, crit[k]) for k, _, n, _ in ARCH_CRITERIA if k in crit and "na" not in crit[k]]
+    built = [r for r in a["rounds"] if r.get("kind") == "as-built"][-1:]
+    label = ("Принята с оговоркой владельца" if g.get("waived") else "Принята, подтвердил второй критик") if g.get("ok") \
+        else "Идёт доработка"
+    return {"score": last["overall"], "pass": ARCH_PASS, "ok": bool(g.get("ok")), "statusLabel": label,
+            "summary": last.get("summary") or "",
+            "rounds": [{"n": i + 1, "overall": r["overall"], "kind": r["kind"]} for i, r in enumerate(gated)],
+            "criteria": [{"name": n, "score": round(c["score"], 1)} for n, c in names],
+            "asBuilt": {"score": built[0]["overall"], "summary": built[0].get("summary") or ""} if built else None}
+
+
+def project_reuse():
+    data = scout_read()
+    if not data or not data.get("capabilities"):
+        return None
+    taken, own = [], []
+    for c in data["capabilities"]:
+        (taken if c.get("decision") in ("adopt", "adapt", "fork") else own).append(
+            {"name": c.get("name") or c.get("id"), "why": c.get("why") or "", "choice": c.get("choice") or ""})
+    return {"taken": taken, "own": own}
+
+
+def project_spend(saved, st):
+    s = dict(saved.get("spend") or {})
+    p = (st or {}).get("pacing") or {}
+    if not s.get("windows"):
+        pairs = (("Вся неделя", p.get("weekly_used_pct")), ("Окно пяти часов", p.get("window_used_pct")))
+        s["windows"] = [{"label": n, "used": v} for n, v in pairs if v is not None]
+    s.setdefault("ceiling", 80)
+    return s
+
+
+def project_timeline(rows, milestones, sched, today, tz):
+    t0, t1 = "T00:00:00" + tz, "T23:59:00" + tz
+    out = []
+    for r in rows:
+        a, b = sched[r["id"]]
+        row = {"plain": r["plain"] or r["title"], "run": r["id"], "gives": r["gives"],
+               "start": a.isoformat() + t0, "end": b.isoformat() + t1}
+        if r["status"] == "landed":
+            row.update(kind="done", group="done", dateText=span_text(a, b))
+        elif r["status"] == "in-flight":
+            row.update(kind="active", group="now", dateText="примерно до " + day_text(b))
+        else:
+            row.update(kind="estimate", group="ahead", dateText="примерно " + span_text(a, b))
+            if r["status"] == "blocked":
+                row["dateText"] = "ждёт решения: " + r["result"]
+        out.append(row)
+    by_id = {r["id"]: r for r in rows}
+    for m in milestones:
+        ends = [sched[x][1] for x in m["after"] if x in sched]
+        at = max(ends) if ends else today
+        ready = bool(m["after"]) and all(by_id.get(x, {}).get("status") == "landed" for x in m["after"])
+        out.append({"plain": m["title"], "run": m["id"], "gives": m["gives"], "kind": "milestone", "group": "milestone",
+                    "at": at.isoformat() + t1, "dateText": "уже можно" if ready else "примерно " + day_text(at)})
+    return out
+
+
+def project_title(lines, saved):
+    if saved.get("title"):
+        return saved["title"]
+    m = next((re.match(r"^#\s*Программа\s*[—–-]\s*(.+)$", x) for x in lines if x.startswith("#")), None)
+    return m.group(1).strip() if m else "Проект"
+
+
+def project_progress(rows, sts, saved, spend):
+    weights = {r["id"]: r["tickets"] or PROGRAM_DEFAULT_TICKETS for r in rows}
+    done = 0
+    for r in rows:
+        if r["status"] == "landed":
+            done += weights[r["id"]]
+        elif r["status"] == "in-flight":
+            done += min(weights[r["id"]], sum(1 for t in (sts.get(r["id"]) or {}).get("tickets") or [] if t.get("status") == "done"))
+    total = sum(weights.values()) or 1
+    landed = sum(1 for r in rows if r["status"] == "landed")
+    tests = next(((sts.get(r["id"]) or {}).get("tests") for r in reversed(rows) if (sts.get(r["id"]) or {}).get("tests")), None)
+    return weights, {
+        "percent": int(round(done * 100 / total / 5.0) * 5), "done": done, "total": total,
+        "percentLabel": "всей работы по проекту сделано",
+        "method": "Считается по планам прогонов: %d из %d запланированных кусков работы (тасков) уже сделаны. Округлено до 5 %%." % (done, total),
+        "howTo": saved.get("howTo") or "Каждая часть полосы — прогон, её ширина — сколько в нём работы.",
+        "tiles": {"workLabel": "Сделано работы", "work": "кусков работы (тасков) готово. Всего столько запланировано.",
+                  "runsValue": str(landed), "runsOf": "из %d" % len(rows), "runs": "прогонов сдано целиком",
+                  "tests": str(tests["passed"]) if tests else "—",
+                  "testsOk": ("все прошли" if not tests["failed"] else "упало %d" % tests["failed"]) if tests else "ещё нет",
+                  "testsNote": "автоматических проверок последнего прогона",
+                  "limit": spend.get("paceLabel") or ""}}
+
+
+def project_now(saved, rows, sts, landed_n):
+    n = saved.get("now") or {}
+    flying = next((r for r in rows if r["status"] == "in-flight"), None)
+    state = "Идёт сейчас: " + (flying["plain"] or flying["title"]) if flying else (
+        "Проект сдан" if rows and landed_n == len(rows) else "Сейчас ни один прогон не идёт")
+    head = "Сдано %d %s из %d." % (landed_n, plural_ru(landed_n, "прогон", "прогона", "прогонов"), len(rows))
+    return {"state": n.get("state") or state, "headline": n.get("headline") or head,
+            "sentence": n.get("sentence") or "", "aside": n.get("aside") or ""}
+
+
+def project_data():
+    lines = program_lines()
+    if lines is None:
+        return None
+    rows, saved = program_rows(lines), json_read(PROJECT_STATE, {})
+    stamp = now()
+    today, tz = date_of(stamp), stamp[-6:]
+    sts = run_states(rows)
+    live = read_state()
+    spend = project_spend(saved, live)
+    weights, progress = project_progress(rows, sts, saved, spend)
+    nxt = next_runnable(rows)
+    sched = program_schedule(rows, today, program_parallel(lines))
+    status = {"landed": "landed", "in-flight": "now", "blocked": "blocked"}
+    runs = [{"id": r["id"], "name": r["title"], "plain": r["plain"] or r["title"], "gives": r["gives"], "weight": weights[r["id"]],
+             "status": status.get(r["status"], "next" if nxt and nxt["id"] == r["id"] else "pending")} for r in rows]
+    timeline = project_timeline(rows, program_milestones(lines), sched, today, tz)
+    dates = [x[0] for x in sched.values()] + [x[1] for x in sched.values()] + [today]
+    pad = dt.timedelta(days=max(3, (max(dates) - min(dates)).days // 6))
+    landed = [r for r in rows if r["status"] == "landed" and r["id"] in sts]
+    flying = next((r for r in rows if r["status"] == "in-flight" and r["id"] in sts), None)
+    current = run_report(flying, sts[flying["id"]]) if flying else None
+    if current:
+        current["nowDoing"] = (saved.get("runNotes") or {}).get(flying["id"], "")
+    landed_n = sum(1 for r in rows if r["status"] == "landed")
+    return {"meta": {"title": project_title(lines, saved), "asOf": stamp, "tz": tz,
+                     "asOfLabel": "%s, %s" % (day_text(today), stamp[11:16]),
+                     "note": "Страница обновляется сама, когда меняется ход работ."},
+            "now": project_now(saved, rows, sts, landed_n), "progress": progress, "runs": runs,
+            "gantt": {"start": min(dates).isoformat(), "end": (max(dates) + pad).isoformat(), "rows": timeline,
+                      "basisShort": "Даты впереди — оценка: сколько дней занимает прогон и что от чего зависит.",
+                      "basisTitle": "Как посчитаны сроки",
+                      "basis": ["Сданные прогоны показаны по настоящим датам.",
+                                "Для остальных берётся оценка дней из плана и порядок зависимостей.",
+                                "Одновременно идёт прогонов: %d." % program_parallel(lines)]},
+            "changes": saved.get("changes") or {"sinceLabel": "", "items": []},
+            "arch": project_arch(), "reuse": project_reuse(), "currentRun": current,
+            "pastRuns": [run_report(r, sts[r["id"]]) for r in reversed(landed)],
+            "spend": spend, "glossary": saved.get("glossary") or GLOSSARY}
+
+
+# ── вопросы владельцу и его ручные дела ─────────────────────────────────────
+
+def questions_read():
+    return json_read(QUESTIONS, {"nextId": 1, "open": [], "manual": [], "resolved": []})
+
+
+def questions_view(saved=None):
+    q = dict(questions_read())
+    saved = json_read(PROJECT_STATE, {}) if saved is None else saved
+    stamp = date_of(now())
+    q.update(key=re.sub(r"\W+", "-", str(saved.get("title") or "project")), listDateLabel=day_text(stamp),
+             nextListLabel=saved.get("nextList") or "",
+             heroNote=saved.get("heroNote") or "Работа из-за этих вопросов не стоит.",
+             manualNote=saved.get("manualNote") or "Это может сделать только ты: пароли, твои аккаунты, твоё разрешение.")
+    return q
+
+
+QUESTION_FIELDS = (("title", "о чём вопрос"), ("about", "контекст: откуда вопрос и почему важен"),
+                   ("agrees", "на что соглашается владелец"), ("recommend", "рекомендация"),
+                   ("why", "почему так советуем"), ("silence", "что будет, если промолчит"))
+
+
+def cmd_question(pos, opt, multi=None):
+    act = pos[0] if pos else "list"
+    q = questions_read()
+    if act == "add":
+        missing = [m for k, m in QUESTION_FIELDS if not text_of(opt.get(k))]
+        if missing:
+            die("вопрос владельцу должен читаться без других страниц, не хватает: " + "; ".join(missing))
+        item = {k: opt[k] for k, _ in QUESTION_FIELDS}
+        item.update(id=q["nextId"], urgency=opt.get("urgency") if isinstance(opt.get("urgency"), str) else "Работу не останавливает")
+        if isinstance(opt.get("before"), str):
+            item["before"] = opt["before"]
+        q["nextId"] += 1
+        q["open"].append(item)
+        json_write(QUESTIONS, q)
+        return ["вопрос %d добавлен" % item["id"]] + project_refresh()
+    if act == "answer":
+        if len(pos) < 2 or not isinstance(opt.get("by-user"), str):
+            die("question answer N --by-user \"его слова\" [--decision \"что решено\"]")
+        hit = next((x for x in q["open"] if str(x["id"]) == pos[1]), None)
+        if hit is None:
+            die("открытого вопроса %s нет" % pos[1])
+        q["open"].remove(hit)
+        q["resolved"].insert(0, {"date": day_text(date_of(now())), "title": hit["title"], "answer": opt["by-user"],
+                                 "decision": opt.get("decision") if isinstance(opt.get("decision"), str) else hit["recommend"]})
+        json_write(QUESTIONS, q)
+        return ["вопрос %s закрыт" % pos[1]] + project_refresh()
+    if act == "list":
+        return question_digest(q)
+    die("question add | answer | list")
+
+
+def question_digest(q):
+    """Текст для чата: на каждый вопрос можно ответить, не открывая ни одной страницы."""
+    if not q["open"] and not q["manual"]:
+        return ["от владельца сейчас ничего не нужно"]
+    out = []
+    for x in q["open"]:
+        out += ["%d. %s" % (x["id"], x["title"]), "   О чём: " + x["about"], "   На что соглашаешься: " + x["agrees"],
+                "   Совет: %s %s" % (x["recommend"], x["why"]), "   Если промолчишь: " + x["silence"],
+                "   Ответ: «%d ок» или свой вариант" % x["id"]]
+    for m in q["manual"]:
+        out += ["Руками — %s" % m["title"], "   Почему только ты: " + m["onlyYou"], "   Зачем: " + m["why"]]
+        out += ["   %d) %s" % (i + 1, s) for i, s in enumerate(m["steps"])]
+    return out
+
+
+def cmd_manual(pos, opt, multi=None):
+    if len(pos) < 2 or pos[0] not in ("add", "done"):
+        die("manual add KEY --title … --only-you … --why … --step … | manual done KEY --by-user \"…\"")
+    act, key = pos[0], pos[1]
+    q = questions_read()
+    if act == "add":
+        steps = (multi or {}).get("step") or []
+        if not all(text_of(opt.get(k)) for k in ("title", "only-you", "why")) or not steps:
+            die("ручное дело: --title, --only-you (почему не может агент), --why и хотя бы один --step")
+        q["manual"].append({"id": key, "title": opt["title"], "onlyYou": opt["only-you"], "why": opt["why"], "steps": steps,
+                            "short": opt.get("short") if isinstance(opt.get("short"), str) else opt["title"],
+                            "urgency": opt.get("urgency") if isinstance(opt.get("urgency"), str) else ""})
+    else:
+        hit = next((x for x in q["manual"] if x["id"] == key), None)
+        if hit is None or not isinstance(opt.get("by-user"), str):
+            die("manual done KEY --by-user \"его слова\" — и такое дело должно быть в списке")
+        q["manual"].remove(hit)
+        q["resolved"].insert(0, {"date": day_text(date_of(now())), "title": hit["title"], "answer": opt["by-user"], "decision": "сделано"})
+    json_write(QUESTIONS, q)
+    return ["ручное дело %s: %s" % (key, "записано" if act == "add" else "закрыто")] + project_refresh()
+
+
+# ── сборка страниц ──────────────────────────────────────────────────────────
+
+def project_template(name):
+    """Шаблон страницы: свежий из навыка, иначе сохранённая копия рядом со страницей."""
+    keep = os.path.join(PROJECT_DIR, "templates", name)
+    src = os.path.join((read_state() or {}).get("skillDir") or "", "report", name)
+    if os.path.isfile(src):
+        os.makedirs(os.path.dirname(keep), exist_ok=True)
+        shutil.copyfile(src, keep)
+    try:
+        return open(keep, encoding="utf-8").read()
+    except OSError:
+        return None
+
+
+def page_lint(node, where=""):
+    """Страницу читает владелец: без кодов, жаргона, путей и секретов."""
+    if isinstance(node, dict):
+        return [x for k, v in node.items() if k not in LINT_KEYS_SKIP for x in page_lint(v, k)]
+    if isinstance(node, list):
+        return [x for v in node for x in page_lint(v, where)]
+    if isinstance(node, str):
+        return ["%s: %s — «%s»" % (why, where, m.group(0)) for rx, why in PAGE_LINT for m in [rx.search(node)] if m]
+    return []
+
+
+def page_json(data):
+    return json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+
+
+def project_write():
+    """Две страницы: ход проекта и вопросы. Данные внутри, поэтому открываются двойным кликом."""
+    p = project_data()
+    if p is None:
+        return None
+    index, questions = project_template("project-template.html"), project_template("questions-template.html")
+    if index is None or questions is None:
+        return ["! шаблонов страницы нет: нужен skillDir в state.js или .autopilot/project/templates/"]
+    q = questions_view({"title": p["meta"]["title"], **json_read(PROJECT_STATE, {})})
+    title = p["meta"]["title"]
+    os.makedirs(PROJECT_DIR, exist_ok=True)
+    for name, tpl, data, heading in (("index.html", index, {"p": p, "q": q}, "%s: ход проекта" % title),
+                                     ("questions.html", questions, q, "%s: вопросы" % title)):
+        html = tpl.replace("__TITLE__", heading.replace("&", "&amp;").replace("<", "&lt;")).replace("__DATA__", page_json(data))
+        with open(os.path.join(PROJECT_DIR, name), "w", encoding="utf-8") as f:
+            f.write(html)
+    return ["! страница: " + x for x in page_lint(p) + page_lint({k: q[k] for k in ("open", "manual")})][:20]
+
+
+def project_refresh():
+    """Страница не отстаёт от работы: пересобирается сама, если у проекта есть программа."""
+    if not os.path.isfile(PROGRAM):
+        return []
+    return project_write() or []
+
+
+def project_save_text(saved, pos, opt, multi):
+    act = pos[0]
+    if act == "now":
+        saved["now"] = {k: opt[k] for k in ("state", "headline", "sentence", "aside") if isinstance(opt.get(k), str)}
+    elif act == "change":
+        if len(pos) < 2:
+            die("project change \"что изменилось\" [--since \"с 8 ноября\"]")
+        ch = saved.setdefault("changes", {"sinceLabel": "", "items": []})
+        if isinstance(opt.get("since"), str):
+            ch.update(sinceLabel=opt["since"], items=[])
+        ch["items"].append(pos[1])
+    elif act == "spend":
+        s = saved.setdefault("spend", {})
+        pairs = [x.partition("=") for x in (multi or {}).get("window", [])]
+        if pairs:
+            s["windows"] = [{"label": a, "used": num(b)} for a, _, b in pairs]
+        for key in ("verdict", "ceilingLabel", "resetLabel", "paceLabel", "moneyCap", "moneyVerdict", "moneyNote"):
+            flag = re.sub(r"[A-Z]", lambda m: "-" + m.group(0).lower(), key)
+            if isinstance(opt.get(flag), str):
+                s[key] = opt[flag]
+        if isinstance(opt.get("ceiling"), str):
+            s["ceiling"] = num(opt["ceiling"])
+    elif act in ("title", "url", "next-list"):
+        if len(pos) < 2:
+            die("project %s \"значение\"" % act)
+        saved[{"title": "title", "url": "url", "next-list": "nextList"}[act]] = pos[1]
+    elif act == "run":
+        if len(pos) < 2 or not isinstance(opt.get("now"), str):
+            die("project run P03 --now \"что делает прогон сейчас\"")
+        saved.setdefault("runNotes", {})[pos[1]] = opt["now"]
+    else:
+        die("project | now | change | spend | title | url | next-list | run | lint")
+
+
+def cmd_project(pos, opt, multi=None):
+    if lint_only := pos[:1] == ["lint"]:
+        pos = []
+    if pos:
+        saved = json_read(PROJECT_STATE, {})
+        project_save_text(saved, pos, opt, multi)
+        json_write(PROJECT_STATE, saved)
+    notes = project_write()
+    if notes is None:
+        die("у проекта нет программы — .autopilot/program.md пишется по phases/0-program.md")
+    url = json_read(PROJECT_STATE, {}).get("url")
+    if lint_only:
+        return notes or ["на странице чисто"]
+    p = json.loads(re.search(r'id="data" type="application/json">(.*?)</script>',
+                             open(os.path.join(PROJECT_DIR, "index.html"), encoding="utf-8").read(), re.S).group(1))
+    return ["страница: .autopilot/project/index.html" + (" · адрес: " + url if url else ""),
+            "сделано примерно %d %%: %s %s прогонов" % (p["p"]["progress"]["percent"], p["p"]["progress"]["tiles"]["runsValue"],
+                                                       p["p"]["progress"]["tiles"]["runsOf"]),
+            "ждёт владельца: вопросов %d, дел руками %d" % (len(p["q"]["open"]), len(p["q"]["manual"]))] + notes
+
+
 # ── команды ─────────────────────────────────────────────────────────────────
 
 def parse_args(argv):
@@ -1896,7 +2567,7 @@ def cmd_init(opt):
     os.makedirs(os.path.join(run_dir(state), "tickets"), exist_ok=True)
     if isinstance(opt.get("program"), str):
         state["program"] = opt["program"]
-        notes.append(program_set(opt["program"], "in-flight", d=state["dir"]))
+        notes.append(program_set(opt["program"], "in-flight", d=state["dir"], started=state["startedAt"][:10]))
     save(state)
     ensure_gitignore()
     register_row(state, "в работе", None)
@@ -2174,6 +2845,14 @@ def cmd_finish(state, opt):
     if problems:
         state["landedWith"] = dict({"problems": problems}, **({"byUser": by_user} if refuse else {}))
         notes += ["! сдано с оговоркой — " + p for p in problems]
+    result = opt.get("result") if isinstance(opt.get("result"), str) else None
+    return notes + land_run(state, result, problems, by_user, "сдан с оговорками" if problems else "сдан")
+
+
+def land_run(state, result, problems, by_user, label):
+    """Общая посадка: папка без --wip, конец прогона, строка в README и в программе."""
+    t = state["updatedAt"]
+    notes = []
     d = state.get("dir") or ""
     if d.endswith("--wip"):
         new = d[: -len("--wip")]
@@ -2185,11 +2864,12 @@ def cmd_finish(state, opt):
         else:
             notes.append("! не смог переименовать %s — оставляю как есть" % d)
     state["finishedAt"] = t
-    state["result"] = opt.get("result") if isinstance(opt.get("result"), str) else None
-    register_row(state, "сдан с оговорками" if problems else "сдан", state["result"])
+    state["result"] = result
+    register_row(state, label, state["result"])
     log(state, "finish", result=state["result"], problems=len(problems))
     if state.get("program"):
-        notes.append(program_set(state["program"], "landed", d=state["dir"], result=state["result"]))
+        notes.append(program_set(state["program"], "landed", d=state["dir"], result=state["result"],
+                                 landed=t[:10], tickets=len(state.get("tickets") or []) or None))
     return notes
 
 
@@ -2236,7 +2916,8 @@ def cmd_commits(state):
              for i, c in lost_commits(state)] or ["коммиты сданных тасков на месте"])
 
 
-PROJECT_COMMANDS = {"program": cmd_program, "arch": cmd_arch, "scout": cmd_scout}
+PROJECT_COMMANDS = {"program": cmd_program, "arch": cmd_arch, "scout": cmd_scout, "project": cmd_project,
+                    "question": cmd_question, "manual": cmd_manual}
 
 
 def main():
@@ -2252,7 +2933,7 @@ def main():
     cmd = pos[0] if pos else ""
     notes = []
     if cmd in PROJECT_COMMANDS:          # проект живёт между прогонами: state.js этим командам не нужен
-        for line in PROJECT_COMMANDS[cmd](pos[1:], opt):
+        for line in PROJECT_COMMANDS[cmd](pos[1:], opt, multi):
             print("  " + (line if line.startswith("!") else "· " + line))
         return
     if cmd == "init":
@@ -2285,6 +2966,8 @@ def main():
         elif cmd == "tickets":
             notes.append(publish_tickets(state))
             log(state, "tickets", n=len(state.get("tickets") or []))
+            if state.get("program") and state.get("tickets"):
+                notes.append(program_set(state["program"], "in-flight", tickets=len(state["tickets"])))
         elif cmd == "check-plan":
             problems = check_plan(state)
             notes += ["! " + p for p in problems] or ["G3: трасса сходится"]
@@ -2317,6 +3000,8 @@ def main():
     save(state)
     write_board(state)
     snap = write_snapshot(state)
+    if state.get("program") and cmd in ("init", "tickets", "ticket", "stage", "tests", "finish", "reopen"):
+        notes += project_refresh()
     if cmd == "finish" or opt.get("stop"):
         srv = stop_later()
     elif opt.get("no-serve"):

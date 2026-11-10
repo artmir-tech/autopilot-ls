@@ -1,10 +1,22 @@
-# autopilot-ls — fork of Autopilot for «Легко Сказать»
+# autopilot-ls — fork of Autopilot for long, nearly autonomous projects
 
-**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), tuned for rebuilding «Легко Сказать», a Russian-language Telegram coaching bot (aiogram, SQLite, versioned XML prompts). It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (76: 47 upstream + 29 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
+**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), for projects of many weeks that run nearly unattended; it was born on the rebuild of «Легко Сказать», a Russian-language Telegram coaching bot. It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Version ls.2 makes big projects first-class: a prior-art stage that decides per part what to take ready-made (licenses and liveness verified against GitHub, not recalled); an architecture stage where an architect and an independent critic iterate until a score computed by the tool reaches 9 of 10 with no criterion under 8, confirmed by a second blind critic; a written master plan of runs with a Gantt; one report page for the whole project with a drill-down page of the owner's decisions; and the ub-mode skill loaded by every coding executor and reviewer. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (130: 47 upstream + 83 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
 
 ---
 
 Ниже — по-русски: что изменено, где и зачем; какие решения приняты без владельца; что отложено.
+
+## Версия ls.2 — большие проекты
+
+**Поиск готового** (`phases/2a-scout.md`, `prompts/scout.md`). После брифа разведчик раскладывает манифест на части и по каждой решает: подключить библиотекой, взять кусок кода, взять проект за основу, изучить или писать самим. То, чем продукт отличается, пишем сами. Лицензию, живость и само существование проверяет `ap.py scout verify` по GitHub и реестрам пакетов, а не память модели. Чужой проект за основу — только словами владельца и после пробы.
+
+**Разработка и аудит архитектуры** (`phases/2b-architecture.md`, `prompts/architect.md`, `prompts/architecture-critic.md`, `standards/architecture-rubric.md`). Архитектор проектирует под продукт владельца, независимый критик оценивает по 18 пунктам и проходит сценарии. Балл считает `ap.py`: нужно не меньше 9 из 10, ни один пункт не ниже 8, без блокирующих находок, и результат вслепую подтверждает второй критик. Шесть кругов, дальше решает владелец. Принятая архитектура — договор для спецификации, тасков и ревью; менять её можно только отдельным аудитом изменения; после каждого прогона код сверяется с ней.
+
+**Чистый код** (`prompts/executor.md`, `prompts/review.md`). Кодерские таски и ревьюеры сами загружают навык `ub-mode` первым действием. Копия в проекте убрана: один текст, всегда свежий. Контракт исполнителя подтверждает загрузку.
+
+**Весь проект — заранее и на диске** (`phases/0-program.md`). Большой проект сначала становится мастер-планом: прогоны, зависимости, размер, сроки, ключевые моменты, отдельный бриф на каждый прогон. Первая сессия кода не пишет и заканчивается планом.
+
+**Отчёт по всему проекту и страница решений** (`report/`, `ap.py project`, `question`, `manual`). Страница показывает общий процент, гант по прогонам, оценку архитектуры, что взято готовым, отчёт каждого прогона с его планом по волнам. Из неё открывается страница решений: у каждого вопроса контекст, на что соглашаешься, рекомендация, что будет при молчании, кнопка «ок» или свой вариант. Числа считает скрипт, простые слова проверяет `project lint`.
 
 ## Как поставить и проверить
 
@@ -13,11 +25,11 @@
 ```bash
 git clone -b ls https://github.com/artmir-tech/autopilot-ls && cd autopilot-ls
 tools/install-ls.sh                          # копия skills/autopilot → ~/.claude/skills/autopilot-ls/
-python3 -m unittest discover -s tests        # 76 тестов
+python3 -m unittest discover -s tests        # 130 тестов
 python3 tools/lint-ls.py                     # каждая ссылка на файл навыка существует
 ```
 
-Запуск в Claude Code — `/autopilot-ls <бриф>`; без слов — продолжение прерванной сборки. Стандарт кода ставится отдельно как навык `ub-mode` (его копия с исключениями лежит в `skills/autopilot/standards/ub-mode.md` и Фазой 0 кладётся в `docs/standards/` проекта). Установленный рядом upstream-навык `autopilot` не мешает: другое имя, другой каталог, свои инструменты.
+Запуск в Claude Code — `/autopilot-ls <бриф>`; без слов — продолжение прерванной сборки. Стандарт чистого кода — навык `ub-mode`: `tools/install-ls.sh` ставит его сам, если его ещё нет. Установленный рядом upstream-навык `autopilot` не мешает: другое имя, другой каталог, свои инструменты.
 
 ## Чем upstream 2.2.3 отличается от того, на что писались правки
 
@@ -84,7 +96,7 @@ python3 tools/lint-ls.py                     # каждая ссылка на ф
 
 Что сработало как задумано: фильтр пути шаблона, `ls-check`, G2 и G3, `isolation: "worktree"` (путь и ветку harness отдаёт сам), гейты unclebob (CRAP, дубли, мутанты; флаги совпали с README), закрытие ветки по файлам и `merge --ff-only` на сдвинувшуюся основную ветку, точечное ревью и две половины ревью ветки, F1, перепроверка ремонта, HTML-страница обзора владельцу и статус `awaiting_owner`, слепая приёмка из чистого клона, отказ `finish` без слова владельца.
 
-## Решения, принятые без Артура
+## Решения, принятые без владельца
 
 1. **Основа — upstream 2.2.3**, а не более старое зеркало: правки перенесены на новую структуру (таблица выше).
 2. **Исполнитель коммитит сам в своей ветке worktree** (ub-mode: «Commit often»), оркестратор вливает серию `--ff-only`; «один коммит на таск» стал «одна непрерывная серия на таск» с записанной базой. Без worktree исполнитель не коммитит — вынужденное третье исключение из ub-mode.
@@ -100,7 +112,7 @@ python3 tools/lint-ls.py                     # каждая ссылка на ф
 12. **Ночь при 85 % окна встаёт на паузу** до сброса, а при недельной доле и первом падении — останавливается совсем.
 13. **Запланированные задачи** (ночная, «продолжить после сброса», следующий прогон программы) — постоянная настройка: вопрос владельцу один раз, ответ записывается в «Договорились».
 14. **`ap.py` проверяет правила отказом** там, где проверка механическая; остальное — суждение оркестратора.
-15. **Оркестратору разрешено писать ещё один файл проекта** — копию `docs/standards/ub-mode.md`.
+15. ~~Оркестратору разрешено писать копию `docs/standards/ub-mode.md`~~ — отменено в ls.2: копии больше нет, исполнители грузят навык.
 16. **`7-instruments.md` создан заново** как справочник данных форка и читается по необходимости — принцип «один файл фазы за раз» сохранён.
 17. **`night_ok` — snake_case**, как в постановке, хотя upstream пишет поля в camelCase.
 18. **Воркеры-сессии — только по словам владельца и никогда ночью**: приложение не стартует сессии из хода, начатого задачей по расписанию; контракт воркера — файл, потому что отчёт сессии доходит обрезанным.

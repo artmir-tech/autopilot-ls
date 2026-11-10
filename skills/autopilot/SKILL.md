@@ -1,10 +1,10 @@
 ---
 name: autopilot-ls
-description: Форк Autopilot для «Легко Сказать» — builds an app, bot or feature end-to-end from a dictated idea (requirements, briefing, spec, tickets, subagents, review, acceptance) with a live dashboard; adds a model and effort per ticket, ub-mode with deterministic gates, prompt tickets with evals, a night queue, token pacing, worker sessions, an e2e phase with an LLM judge and a program of several runs. Starts only on /autopilot-ls; a bare /autopilot-ls resumes an interrupted run.
+description: Форк Autopilot для долгой, почти автономной разработки — builds an app, bot or feature end-to-end from a dictated idea (requirements, briefing, prior-art search, architecture audited to 9 of 10, spec, tickets, subagents, review, acceptance) with a live dashboard; a project of several weeks becomes a written master plan of runs with a Gantt, one report for the whole project and a page of decisions for the owner; adds a model and effort per ticket, the ub-mode clean-code skill with deterministic gates, prompt tickets with evals, a night queue, token pacing, worker sessions, an e2e phase with an LLM judge and a program of several runs. Starts only on /autopilot-ls; a bare /autopilot-ls resumes an interrupted run.
 disable-model-invocation: true
 argument-hint: "[full|semi|interview|manual] [strict|deep] [night] что нужно построить или путь к brief.md"
 metadata:
-  version: "2.2.3-ls.1"
+  version: "2.2.3-ls.2"
   upstream: "nick-vels/skills@5ed4b79 (Autopilot 2.2.3)"
 ---
 
@@ -12,7 +12,7 @@ metadata:
 
 Autopilot-ls flies a dictated idea from words to a working project **in one dialogue**, without making the user approve each stage. Every rule it needs lives in `phases/` and `prompts/`; the only outside dependency is the `ub-mode` clean-code skill, which every coding executor and reviewer loads (`prompts/executor.md`).
 
-**A fork of Autopilot 2.2.3 for «Легко Сказать»** — what differs and why is in `CHANGES-ls.md` at the root of the skill's repository. It coexists with an installed `autopilot`: the trigger is `/autopilot-ls`, and the instruments are always copied from this skill's own directory (`phases/0-instruments.md`).
+**A fork of Autopilot 2.2.3 for long, nearly autonomous projects** — what differs and why is in `CHANGES-ls.md` at the root of the skill's repository. It coexists with an installed `autopilot`: the trigger is `/autopilot-ls`, and the instruments are always copied from this skill's own directory (`phases/0-instruments.md`).
 
 **The order is the product.** Code is written in the second-to-last phase. Everything before it decides *what* to build; everything after it proves the right thing got built.
 
@@ -35,7 +35,7 @@ This file is the orchestrator: order, gates, the rules that never lose. Each pha
 | 6 Review | `phases/6-review.md` — at the first point review, and for the whole-branch review | reviewed code |
 | 8 Final | `phases/8-final.md`, then `phases/8a-e2e.md` after the blind verdict, and `phases/9-memory.md` before spawning the memory agent | blind acceptance, e2e replay, memory, progress file, report |
 | — | `phases/0-resume.md` — instead of preflight, when resuming | |
-| — | `phases/0-program.md` — when `.autopilot/program.md` exists, or the work is over the T3 ceiling | `program.md`, the next run picked |
+| — | `phases/0-program.md` — when `.autopilot/program.md` exists, or the work is over one run | the master plan, a brief per run, the next run picked, the owner's page, questions |
 | — | `phases/5-repair.md` — when a ticket comes back anything but a clean `DONE` | |
 | — | `phases/5-prompts.md` — at the first launch of a `Тип: prompt` ticket | prompts with versions, evals, A/B |
 | — | `phases/5-night.md` — instead of asking anything, when `/autopilot-ls night` started the session | the night queue flown, `night-<дата>.md` |
@@ -71,6 +71,10 @@ The fork adds two stages, `scout` and `architecture`, so the dashboard knows ten
 | method (`[МЕТОДИКА — подтверди]`) | методика |
 | `dispatch: sessions` | сессии-исполнители |
 | `program` · its row | Программа · прогон программы |
+| `.autopilot/project/` | Ход проекта |
+| `questions.html` · `question` · `manual` | Решения · вопрос · дело руками |
+| gate GA · `reuse` | Оценка архитектуры · готовое и своё |
+| `core` | то, чем продукт отличается |
 
 ## The flight
 
@@ -125,6 +129,10 @@ Binding on every phase; the phases do not restate it.
 │   ├── carried.md              what the last run left, read at preflight — after a landed run only
 │   ├── memory-proposal.md      what to add to the user's own memory file, if it is theirs
 │   └── tickets/NN-<slug>.md
+├── architecture.md  the accepted design; audits in architecture-audit/
+├── prior-art.*      what exists ready-made, and what we decided about each part
+├── program.md       the master plan of a big project; briefs/P0N.md, one per run
+├── project/         the owner's pages: index.html, questions.html
 ├── README.md        how to read this folder, and the register of runs
 ├── PROGRESS.md       where the work stands between runs — read by the next run and by plain sessions
 ├── program.md       the program — several runs and their dependencies, when one run is not enough
