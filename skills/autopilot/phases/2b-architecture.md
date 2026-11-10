@@ -54,8 +54,10 @@ Reading the verdict:
 Section 18 of the document and every finding with `owner: true` are decisions the agents may not make: money, what is in the product, method, law. Each becomes a card on the owner's page, in plain words:
 
 ```bash
-python3 .autopilot/ap.py question add --title "…" --about "…" --agrees "…" --recommend "…" --why "…" --silence "…"
+python3 .autopilot/ap.py question add --title "…" --about "…" --agrees "…" --recommend "…" --why "…" --silence "…" --urgency "Закрывает запуск"
 ```
+
+**You** carry them over from section 18; the architect reads `.autopilot/project/questions.json` so it does not ask twice. A question that does not stop building but blocks going live carries the urgency «Закрывает запуск» and is named again in every report until it is answered.
 
 - `semi`, `interview`, `manual`: ask before the next round when the answer changes the design. A question that does not change it waits for the next list.
 - `full`: the recommendation is taken, recorded as an `ASSUMPTION` row, and listed in the report.
