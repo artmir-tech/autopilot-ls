@@ -1,10 +1,32 @@
 # autopilot-ls — fork of Autopilot for long, nearly autonomous projects
 
-**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), for projects of many weeks that run nearly unattended; it was born on the rebuild of «Легко Сказать», a Russian-language Telegram coaching bot. It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Version ls.2 makes big projects first-class: a prior-art stage that decides per part what to take ready-made (licenses and liveness verified against GitHub, not recalled); an architecture stage where an architect and an independent critic iterate until a score computed by the tool reaches 9 of 10 with no criterion under 8, confirmed by a second blind critic; a written master plan of runs with a Gantt; one report page for the whole project with a drill-down page of the owner's decisions; and the ub-mode skill loaded by every coding executor and reviewer. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (142: 47 upstream + 95 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
+**In English, briefly.** `autopilot-ls` is a fork of the [Autopilot](https://github.com/nick-vels/skills) skill for Claude Code (base: Autopilot 2.2.3, commit `5ed4b79`), for projects of many weeks that run nearly unattended; it was born on the rebuild of «Легко Сказать», a Russian-language Telegram coaching bot. It keeps Autopilot's core — the verbatim-brief manifest, the four gates, the blind acceptance — and adds: a model and an effort per ticket with an escalation ladder; a git worktree per executor and commits limited to the ticket's files; Uncle Bob's [ub-mode](https://github.com/unclebob/ub-mode) as the executors' code standard with deterministic gates (CRAP, duplication, mutation) that block on their own; prompt tickets with evals, A/B against the previous version, an LLM prompt reviewer and an HTML review page for the owner; a night queue with a hard stop and a morning report; pacing against the 5-hour usage window; experimental worker sessions; an e2e phase replaying real (consented, anonymised) dialogues with a judge from another model family; and a program of several runs. Version ls.2 makes big projects first-class: a prior-art stage that decides per part what to take ready-made (licenses and liveness verified against GitHub, not recalled); an architecture stage where an architect and an independent critic iterate until a score computed by the tool reaches 9 of 10 with no criterion under 8, confirmed by a second blind critic; a written master plan of runs with a Gantt; one report page for the whole project with a drill-down page of the owner's decisions; and the ub-mode skill loaded by every coding executor and reviewer. Version ls.3 makes that cheaper and stricter: architecture rounds stop by themselves when serious findings stop falling, and a judge removes matters of taste before any repair; risk, not only size, decides the full path; the spec names what the product must never quietly become and closes a fixed list of data edges; a criterion marked in advance needs a test before anyone may call it done; and a plan cannot shrink a request without the owner's words. Rules that a long run tends to forget are enforced by `ap.py` refusals, not by prose. Trigger: `/autopilot-ls`. Tests: `python3 -m unittest discover -s tests` (160: 47 upstream + 113 new). Licence: MIT, as upstream. Get it: `git clone -b ls https://github.com/artmir-tech/autopilot-ls` — the fork lives on branch `ls`; `main` mirrors upstream.
 
 ---
 
 Ниже — по-русски: что изменено, где и зачем; какие решения приняты без владельца; что отложено.
+
+## Версия ls.3 — дешевле и строже
+
+После живой проверки ls.2 и разбора похожих открытых проектов (Make Feature, GSD, BMAD, superpowers; взяты идеи, не текст).
+
+**Круги архитектуры останавливаются сами** (`tools/ap.py`, `phases/2b-architecture.md`). Живой круг стоил около 300 тысяч токенов и поднял оценку с 7,79 до 8,07. Теперь, если серьёзных находок не стало меньше, чем в прошлом обычном круге, следующий круг запрещён до ответа владельца: `arch continue` или `arch waive`, только его словами.
+
+**Судья между критиком и ремонтом** (`prompts/architecture-judge.md`). Свежий агент разбирает каждую блокирующую и важную находку: настоящая ошибка, обоснованный риск, вкус, опровергнуто документом. Вкус и опровергнутое в ремонт и в следующий круг не идут. Пока судья не отработал, следующего круга нет.
+
+**Критик называет, где пришлось бы угадывать** (`prompts/architecture-critic.md`): места, где неверная догадка исполнителя изменила бы план.
+
+**Полный путь по риску** (`phases/2a-scout.md`, `phases/2b-architecture.md`). Деньги, права доступа, необратимая потеря данных или миграция, непроверенная ключевая интеграция: поиск готового и архитектуру нельзя пропустить из-за малого размера.
+
+**Запреты, края данных, «не могу подтвердить»** (`phases/3-spec.md`, `phases/4-plan.md`, `phases/8-final.md`, `prompts/review.md`). Спецификация называет, чем продукт не должен незаметно стать; это методика и решение владельца. Требования с данными проходят закрытый список из восьми краёв: критерий или причина, молчание не принимается. Пункты, правильный ответ для которых не следует из брифа, размечаются заранее, и без теста слепая приёмка и ревью не вправе сказать «реализовано».
+
+**Ревьюер и план** (`prompts/review.md`, `phases/6-review.md`, `tools/ap.py`). Дефект, которого требует сам план, остаётся находкой с пометкой «по плану». В ответе обязательны строки о дефектах по плану и о тех, кто пользуется изменённым. `check-plan` отказывает таску со словами «v1», «упрощённо», «заглушка» и подобными без строки `**Урезание:**` со словами владельца; ремонтные таски идут по тому же правилу.
+
+**Мелочи.** Возобновление сначала смотрит старую копию исполнителя и не теряет стоящую работу; третий перезапуск таска без слов владельца запрещён. Проверка уязвимостей зависимостей раз в сборку. Новое решение поиска `configure`: код не нужен. Два отказа среды подряд останавливают ночь, утром названо нужное разрешение.
+
+**Решено по ходу, без владельца.** Снятая судьёй блокирующая находка больше не держит минимум по своему критерию: ap.py сам ограничивал этот критерий семёркой, значит и снимает ограничение он. Вопросы с `owner: true` судья снять не может. Обычный круг сравнивается только с обычным кругом прямо перед ним: после подтверждающего критика счёт начинается заново.
+
+**Что проверено и что нет.** Счёт, остановка и судья покрыты тестами и прогнаны на настоящих файлах аудита учебного проекта; настоящий агент-судья ещё не запускался. Запреты, края данных, метка теста и новые строки ревьюера — инструкции: в настоящей сборке они пока не работали.
 
 ## Версия ls.2 — большие проекты
 
@@ -27,7 +49,7 @@
 ```bash
 git clone -b ls https://github.com/artmir-tech/autopilot-ls && cd autopilot-ls
 tools/install-ls.sh                          # копия skills/autopilot → ~/.claude/skills/autopilot-ls/
-python3 -m unittest discover -s tests        # 142 теста
+python3 -m unittest discover -s tests        # 160 тестов
 python3 tools/lint-ls.py                     # каждая ссылка на файл навыка существует
 ```
 

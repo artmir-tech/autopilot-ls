@@ -33,7 +33,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | Event | Call |
 |---|---|
 | prior art written | `scout verify`, then `scout check` — gate GS (`phases/2a-scout.md`) |
-| an audit of the architecture written | `arch round --file <NN.json> [--kind confirm\|delta\|as-built]` — gate GA; `arch start`, `arch status`, `arch delta --note`, `arch waive --by-user` (`phases/2b-architecture.md`) |
+| an audit of the architecture written | `arch round --file <NN.json> [--kind confirm\|delta\|as-built]` — gate GA; `arch start`, `arch status`, `arch judge --file`, `arch continue --by-user`, `arch delta --note`, `arch waive --by-user` (`phases/2b-architecture.md`) |
 | the master plan written or changed | `program check`; closing the planning run: `program plan --result` (`phases/0-program.md`) |
 | the owner's page | `project` builds it; `project now · change · spend · next-list · url · run · lint` |
 | a question or a manual action | `question add · answer · list`, `manual add · done` |
