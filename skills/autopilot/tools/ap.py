@@ -347,6 +347,8 @@ def parse_ticket(path):
         "attention": get("внимание", "attention").lower() or None,
         "architecture": get("архитектура", "architecture") or None,
         "night_ok": yes_no(get("ночью", "night")),
+        "shrinks": ls_shrink_words(text),
+        "shrinkBy": get("урезание", "shrink") or None,
     }
 
 
@@ -418,10 +420,37 @@ def ls_night_row_problems(state, tickets):
             for r in sorted({x.split(".")[0] for x in t.get("requirements", [])}) if rows.get(r) == "open"]
 
 
+LS_SHRINK = re.compile(r"(?<![/\w.-])v1\b(?!\.\d)|упрощ[её]нн|пока статич|заглушк|потом допилим|в первой версии", re.I)
+
+
+def ls_shrink_words(text):
+    """Слова, которыми задача тихо становится меньше. Цитата брифа — слова заказчика, в обратных кавычках — код."""
+    found = set()
+    for line in text.splitlines():
+        if line.lstrip().startswith(">"):
+            continue
+        bare = re.sub(r"`[^`]*`", "", line)
+        found |= {m.group().lower() for m in LS_SHRINK.finditer(bare)
+                  if not (m.group().lower() == "заглушк" and re.search(r"тест", bare, re.I))}
+    return sorted(found)
+
+
+def ls_shrink_problems(state, tickets):
+    """Отложить часть просьбы может только заказчик: план не обещает меньше, чем просили (phases/4-plan.md)."""
+    rows, out = dict(manifest_rows(state) or []), []
+    for t in tickets:
+        bases = {r.split(".")[0] for r in t.get("requirements", [])}
+        allowed = "«" in (t.get("shrinkBy") or "") or (bases and all(rows.get(b) == "placeholder" for b in bases))
+        if t.get("shrinks") and not allowed:
+            out.append("таск %s: «%s» — похоже, задача урезается. Отложить может только заказчик: "
+                       "строка **Урезание:** «его слова», или перепиши таск" % (t["id"], "», «".join(t["shrinks"])))
+    return out
+
+
 def ls_plan_problems(state, tickets):
     return ([p for t in tickets for p in ls_field_problems(t) + ls_zone_problems(t)]
             + ls_wave_problems(tickets) + ls_night_row_problems(state, tickets)
-            + ls_arch_ticket_problems(tickets))
+            + ls_arch_ticket_problems(tickets) + ls_shrink_problems(state, tickets))
 
 
 # ── форк autopilot-ls: ночная очередь (phases/5-night.md) ──────────────────

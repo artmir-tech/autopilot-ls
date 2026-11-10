@@ -17,7 +17,7 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | `tickets[].status` = `awaiting_owner` | — | landed, reviewed, waiting for the owner's word on its review page | `ticket NN await --page …` |
 | `tickets[].page` · `approvedByUser` | — | the review page's path; the owner's words that approved it | `ticket NN await`, `ticket NN done --by-user` |
 
-`check-plan` refuses a ticket without one of the five header fields, with a value outside the lists, with `Ночью: да` beside `Внимание: owner`, a `migration` sharing its wave, a non-prompt ticket writing into `prompts/`, and a prompt ticket writing outside `prompts/` and `evals/` — each as a `!` line of gate G3.
+`check-plan` refuses a ticket without one of the five header fields, with a value outside the lists, with `Ночью: да` beside `Внимание: owner`, a `migration` sharing its wave, a non-prompt ticket writing into `prompts/`, a prompt ticket writing outside `prompts/` and `evals/`, and a ticket whose text shrinks the task without the owner's words (`phases/4-plan.md`) — each as a `!` line of gate G3.
 
 ## The fork's commands
 

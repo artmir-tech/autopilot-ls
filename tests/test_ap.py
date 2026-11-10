@@ -651,6 +651,39 @@ class Run(Base):
         code, out = self.ap("check-plan")
         self.assertIn("таск 03 (migration) делит волну 2 с 02 — миграция летит одна", out)
 
+    def shrunk(self, tid, line):
+        self.write("tickets/%s-s.md" % tid, ticket(tid, "Поиск", "R02", "02", ["src/s/"], 3) + line + "\n")
+        return self.ap("check-plan")[1]
+
+    def test_check_plan_refuses_a_ticket_that_shrinks_the_task(self):
+        self.plan()
+        out = self.shrunk("03", "- [ ] В первой версии поиска нет")
+        self.assertIn("таск 03: «в первой версии»", out)
+        self.assertNotIn("G3: трасса сходится", out)
+
+    def test_only_the_owners_words_let_a_ticket_shrink_the_task(self):
+        self.plan()
+        self.assertIn("таск 03: «упрощённ»", self.shrunk("03", "Упрощённо.\n**Урезание:** без цитаты"))
+        out = self.shrunk("03", "Упрощённо.\n**Урезание:** «поиск сделаем потом»")
+        self.assertIn("G3: трасса сходится", out)
+
+    def test_a_repair_ticket_answers_to_the_same_rule(self):
+        self.plan()
+        out = self.shrunk("F1", "- [ ] Потом допилим отступы")
+        self.assertIn("таск F1: «потом допилим»", out)
+
+    def test_quotes_code_and_test_stubs_do_not_count_as_shrinking(self):
+        self.plan()
+        out = self.shrunk("03", "> «пока упрощённо»\n- [ ] Адрес `/api/v1/users` отвечает\n- [ ] Заглушка в тестах вместо сервиса")
+        self.assertIn("G3: трасса сходится", out)
+
+    def test_a_placeholder_row_may_have_its_stub(self):
+        self.plan()
+        self.write("manifest.md", self.manifest().replace("| R02 | «складывает в таблицу» | in-spec", "| R02 | «складывает в таблицу» | placeholder"))
+        self.assertIn("placeholder", self.manifest())
+        out = self.shrunk("03", "- [ ] Видимая заглушка вместо таблицы")
+        self.assertNotIn("таск 03: «заглушк»", out)
+
     def test_check_plan_keeps_the_prompt_zone_for_prompt_tickets(self):
         self.plan()
         self.write("tickets/03-p.md", ticket("03", "Промпт", "R02", "01", ["prompts/coach/", "evals/coach/"], 2,
