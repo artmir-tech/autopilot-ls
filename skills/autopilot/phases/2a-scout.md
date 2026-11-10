@@ -4,9 +4,11 @@
 
 **The goal is not to find a project to copy.** Nearly all the value is in the small end: a library for a commodity part (a Telegram framework, a date parser, a job queue) adopted as a dependency, behind a port. Taking a whole foreign project as a base is rare, usually costs more than it saves, and is never decided by an agent.
 
-## 0. Size first, code first
+## 0. Size and risk first, code first
 
 **Size.** One line to yourself, from the brief and the briefing: «~N тысяч строк: …». Up to ~3K is T0, up to ~6K T1, up to ~18K T2, up to ~36K T3; more, or several weeks of work, is a program of several runs. Phases 2a and 2b both route on it.
+
+**Risk.** One more line beside it. Does the work touch **money**, **access rights**, **irreversible loss of data or a migration**, or **a key integration nobody has checked yet**? Name which, or «риска нет». This is where a small change costs the most, and size says nothing about it, so **a risk sends the work down the full path at any size**: Phases 2a and 2b may not be skipped for being small.
 
 **Existing code.** When Phase 0 found code, run the exploring subagent described at the top of `phases/3-spec.md` **now**: the scout must know the stack and the dependencies already there, and the architect gets the same `notes.md`. Phase 3 does not repeat it.
 
@@ -14,8 +16,9 @@
 
 | Situation | What runs |
 |---|---|
-| a list of edits in existing code, nothing new to source | `ap.py stage scout skip --note "<почему искать незачем, простыми словами>"` |
-| a new small product (T0, T1) | **light**: analogues of the whole product and the two or three obvious libraries, at most five searches |
+| a risk from §0, at any size | **full**, scope `run`, unless a project-wide search already covers it. Only the owner's «пишем сами» below can skip it |
+| a list of edits in existing code, nothing new to source, no risk | `ap.py stage scout skip --note "<почему искать незачем, простыми словами>"` |
+| a new small product (T0, T1), no risk | **light**: analogues of the whole product and the two or three obvious libraries, at most five searches |
 | T2, T3, or `deep` | **full**, scope `run` |
 | a project over one run | **full**, scope `project`, once; later runs read it and skip with a note |
 | the owner said «пишем сами» | skip, with those words in the note — but the architect still may not reinvent a commodity without a reason |

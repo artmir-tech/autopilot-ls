@@ -6,12 +6,12 @@ An architect designs. A critic who has never met the architect scores the design
 
 ## 1. Size first — does this need it, and is it one run at all?
 
-Phase 2a sized the work (`phases/2a-scout.md` §0). If it was skipped, size it now the same way. Then:
+Phase 2a sized the work and named its risk (`phases/2a-scout.md` §0). If it was skipped, do both now the same way. Then:
 
 | Estimate | Route |
 |---|---|
-| up to ~6K lines (T0, T1), depth not `deep`, the owner did not ask | `ap.py stage architecture skip --note "<почему не нужна, простыми словами>"` → Phase 3 |
-| ~6–36K lines (T2, T3), or `deep`, or the owner asked | this phase, scope `run` |
+| up to ~6K lines (T0, T1), depth not `deep`, the owner did not ask, **no risk** | `ap.py stage architecture skip --note "<почему не нужна, простыми словами>"` → Phase 3 |
+| ~6–36K lines (T2, T3), or `deep`, or the owner asked, or **a risk at any size** | this phase, scope `run` |
 | over ~36K lines, or several weeks of work | this phase, scope `project`, then the master plan: **read `phases/0-program.md`** after the gate |
 
 **A project that already has an accepted architecture** (`ap.py arch status` says «принята») does not get a new one. The run reads it, and if its brief does not change it: `stage architecture skip --note "архитектура проекта принята, этот прогон её не меняет"`. If it does — §6.
