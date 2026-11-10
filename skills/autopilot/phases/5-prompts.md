@@ -28,7 +28,7 @@ evals/<stage>/cassettes/    recorded answers, keyed by hash(prompt version + inp
 
 **A text artifact with no model behind it** — CLI hints, message templates, `model_hint: none` — goes through the same track with every check deterministic: no cassettes, no live run, no judge; A/B compares the check results of the two versions. It is still a prompt ticket: the zone, the version, the review and the owner's page hold.
 
-These replace seam tests and `make gates` for this ticket; the check command for it is `make prompt-check STAGE=<stage>` — lint, budget, offline eval — and it runs in steps 5–6 of `phases/5-subagents.md` where the check and the gates would.
+These replace seam tests and `make gates` for this ticket; the check command for it is `make prompt-check STAGE=<stage>` — lint, budget, offline eval — and it runs in steps 5–6 of `phases/5-subagents.md` where the check and the gates would: step 5 is `ap.py check NN --cwd "$WT" --cmd "make prompt-check STAGE=<stage>"`, and `--cmd` is refused for anything else.
 
 ## The executor and the review
 

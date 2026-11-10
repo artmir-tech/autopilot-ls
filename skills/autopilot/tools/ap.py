@@ -13,7 +13,9 @@
     python3 .autopilot/ap.py ticket 02 03 start         # волна ушла
     python3 .autopilot/ap.py ticket 02 review
     python3 .autopilot/ap.py ticket 02 repair --note "пустой адрес проходит — R01.1"
-    python3 .autopilot/ap.py ticket 02 done --tests 34/0 --commit a1b2c3d
+    python3 .autopilot/ap.py set checkCmd="make check"     # чем проверять проект
+    python3 .autopilot/ap.py check 02 --cwd <папка таска>  # тесты запускает и записывает скрипт
+    python3 .autopilot/ap.py ticket 02 done --commit a1b2c3d   # только на зелёной записи этого кода
     python3 .autopilot/ap.py ticket 03 retry | fail --note "…" | reset   # retry и repair — не больше двух
     python3 .autopilot/ap.py ticket 03 reset --by-user "«давай ещё раз, ключ добавил»"   # упавший — только так
     python3 .autopilot/ap.py stage build done | fail --note "…"
@@ -22,7 +24,7 @@
     python3 .autopilot/ap.py coverage found=2 fixed=1 deferred=1 --item "R07 — отложено: …"
     python3 .autopilot/ap.py add report "Два формата даты в уведомлениях — оставлено"
     python3 .autopilot/ap.py blind checked=12 matched=11 --mismatch "R07 — статус не виден"   # два раза за прогон
-    python3 .autopilot/ap.py tests 34/0                 # последний полный прогон
+    python3 .autopilot/ap.py check branch               # последний полный прогон
     python3 .autopilot/ap.py ask briefing --note "три вопроса в чате"   # ждём пользователя
     python3 .autopilot/ap.py answered                   # ответил (stage/ticket закрывают сами)
     python3 .autopilot/ap.py finish --result "Бот принимает заявки и пишет их в таблицу"
@@ -55,6 +57,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -194,6 +197,7 @@ def fresh_state(a):
         "debt": {"placeholders": [], "assumptions": [], "emptyEnv": []},
         "additions": [], "coverage": None, "concerns": [], "blind": None, "beats": [t],
         "rev": 0, "waiting": None, "waits": [], "log": [], "reqList": [], "gates": {}, "result": None,
+        "evidence": a.get("evidence") != "off",
     }
 
 
@@ -361,7 +365,7 @@ LS_FIELDS = (("type", "Тип", ("code", "prompt", "migration", "e2e", "infra"))
              ("effort", "Усилие", ("low", "medium", "high", "xhigh")),
              ("attention", "Внимание", ("none", "review", "owner")))
 LADDER = [("haiku", "low"), ("sonnet", "medium"), ("opus", "high"), ("opus", "xhigh")]
-LS_KEEP = ("attempts", "gates", "base", "session")
+LS_KEEP = ("attempts", "gates", "base", "session", "noCheck")
 
 
 def yes_no(v):
@@ -2838,6 +2842,145 @@ def close_requirements(state, tk, opt, t):
 CAP = 2      # дозапросов и свежих перезапусков на таск — phases/5-repair.md
 
 
+# ── форк autopilot-ls: тесты запускает и записывает сам скрипт ─────────────
+
+CHECK_TIMEOUT = 1800     # полчаса: зависшая проверка — красная, а не вечная
+
+
+def check_path(state, target):
+    return os.path.join(A, state["dir"], "checks", "%s.json" % target)
+
+
+def check_git(cwd, *args):
+    r = subprocess.run(["git", "-C", cwd] + list(args), capture_output=True, text=True)
+    return r.stdout.rstrip() if r.returncode == 0 else None     # слева не режем: в status важен отступ
+
+
+def check_tree(cwd, rev):
+    return check_git(cwd, "rev-parse", "--verify", "-q", rev + "^{tree}")
+
+
+def check_counts(output):
+    """Сколько тестов прошло и упало — из вывода pytest, vitest, jest, unittest. Не разобрали — None."""
+    lines = re.sub(r"\x1b\[[0-9;]*m", "", output).splitlines()
+    for line in reversed(lines):
+        if re.match(r"\s*(Snapshots|Test Suites|Test Files)\b", line) or not re.search(r"\d+ (passed|failed)\b", line):
+            continue
+        found = re.findall(r"(\d+) (passed|failed|errors?)\b", line)
+        passed = sum(int(n) for n, word in found if word == "passed")
+        return {"passed": passed, "failed": sum(int(n) for n, _ in found) - passed}
+    ran = [m for m in (re.match(r"Ran (\d+) tests? in", x) for x in lines) if m]
+    if not ran:
+        return None
+    verdicts = [x for x in lines if x.startswith("FAILED (")]
+    bad = sum(int(n) for n in re.findall(r"(?:failures|errors)=(\d+)", verdicts[-1])) if verdicts else 0
+    return {"passed": int(ran[-1].group(1)) - bad, "failed": bad}
+
+
+def check_capture(cmd, cwd):
+    """Код выхода и весь вывод. Зависшую проверку снимаем вместе с её дочерними процессами."""
+    p = subprocess.Popen(cmd, shell=True, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True, errors="replace", start_new_session=True)
+    try:
+        out, _ = p.communicate(timeout=CHECK_TIMEOUT)
+        return p.returncode, out
+    except subprocess.TimeoutExpired:
+        os.killpg(p.pid, signal.SIGKILL) if hasattr(os, "killpg") else p.kill()
+        out, _ = p.communicate()
+        return 124, out + "\nпроверка не уложилась в %d с" % CHECK_TIMEOUT
+
+
+def check_command(state, target, opt):
+    tk = next((t for t in state.get("tickets") or [] if t["id"] == target), None)
+    if target != "branch" and tk is None:
+        die("таска %s нет — сначала `ap.py tickets`" % target)
+    override = opt.get("cmd")
+    if override is None:
+        if not state.get("checkCmd"):
+            die("команды проверки нет: `ap.py set checkCmd=\"make check\"`")
+        return state["checkCmd"]
+    if not (tk and tk.get("type") == "prompt" and isinstance(override, str) and override.startswith("make prompt-check")):
+        die("--cmd только для prompt-таска и только make prompt-check STAGE=<этап>")
+    return override
+
+
+def check_dirty(cwd):
+    """Незакоммиченное вне .autopilot/: проверять надо код, который попадёт в коммит."""
+    out = check_git(cwd, "status", "--porcelain") or ""
+    return [x[3:] for x in out.splitlines() if not x[3:].strip('"').startswith(".autopilot/")]
+
+
+def check_publish(state, rec):
+    """Полный прогон — число на дашборде; запись одного таска state.js не трогает."""
+    if rec["tests"]:
+        state["tests"] = rec["tests"]
+        state["updatedAt"] = now()
+        beat(state)
+        log(state, "tests", **state["tests"])
+        save(state)
+        write_snapshot(state)
+
+
+def cmd_check(pos, opt):
+    """Тесты запускает скрипт, и итог пишет он же: агент не может вписать «всё зелёное» сам."""
+    state = read_state()
+    if state is None:
+        die("state.js ещё нет — начни с `ap.py init`")
+    if len(pos) != 1:
+        die("check <таск> | check branch [--cwd <папка>]")
+    target, cwd = pos[0], opt["cwd"] if isinstance(opt.get("cwd"), str) else ROOT
+    cmd = check_command(state, target, opt)
+    tree = check_tree(cwd, "HEAD")
+    if tree is None:
+        die("в %s нет git-коммита — проверять нечего" % cwd)
+    dirty = check_dirty(cwd)
+    if dirty:
+        die("есть незакоммиченные файлы, сначала коммит: " + ", ".join(dirty[:5]))
+    code, output = check_capture(cmd, cwd)
+    tests = check_counts(output)
+    rec = {"target": target, "ok": code == 0 and (tests is None or (tests["passed"] > 0 and tests["failed"] == 0)),
+           "exit": code, "tests": tests, "tree": tree, "commit": check_git(cwd, "rev-parse", "--short", "HEAD"),
+           "cmd": cmd, "at": now(), "tail": output.splitlines()[-30:]}
+    os.makedirs(os.path.dirname(check_path(state, target)), exist_ok=True)
+    json_write(check_path(state, target), rec)
+    print("\n".join(rec["tail"]))
+    if target == "branch":
+        check_publish(state, rec)
+    count = "%d/%d" % (tests["passed"], tests["failed"]) if tests else "счётчик не разобран, решил код выхода"
+    if not rec["ok"]:
+        die("проверка %s красная: код %d, %s" % (target, code, count))
+    print("  · проверка %s зелёная, %s" % (target, count))
+
+
+def check_guard(state, tk, act, opt, by_user):
+    """Таск вливается только на зелёной записи именно этого кода. Возвращает запись для учёта."""
+    if not state.get("evidence") or act not in ("done", "review") or not isinstance(opt.get("commit"), str):
+        return None
+    i = tk["id"]
+    if opt.get("no-check"):
+        if not by_user:
+            die("таск %s: без проверки — только при сбое машины и словами владельца: --no-check --by-user \"«…»\"" % i)
+        tk["noCheck"] = by_user
+        return None
+    rec = json_read(check_path(state, i), None)
+    if rec is None:
+        die("таск %s: тесты не запускались — сначала `ap.py check %s --cwd <папка таска>`" % (i, i))
+    if not rec.get("ok"):
+        die("таск %s: последняя проверка красная — почини и запусти `ap.py check %s` снова" % (i, i))
+    if rec.get("tree") != check_tree(ROOT, opt["commit"]):
+        die("таск %s: код изменился после проверки — запусти `ap.py check %s` снова" % (i, i))
+    return rec
+
+
+def check_landing(state):
+    if not state.get("evidence"):
+        return []
+    rec = json_read(check_path(state, "branch"), None)
+    if rec is None:
+        return ["тесты всей ветки не запускались: `ap.py check branch`"]
+    return [] if rec.get("ok") else ["тесты всей ветки красные: `ap.py check branch`"]
+
+
 def refuse_ticket(tk, act, by_user, commit):
     """Лимиты ремонта — не совет, а отказ: оркестратор долгого прогона забывает
     текст правила, а отказ команды забыть нельзя. Упавший таск снова пускает
@@ -2874,11 +3017,16 @@ def cmd_ticket(state, pos, opt):
     ls_night_guard(state, act, ids)
     ls_pacing_guard(state, act, ids)
     ls_owner_guard(state, act, ids, opt)
+    if state.get("evidence") and opt.get("tests"):
+        die("число тестов вручную не пишется — его записывает `ap.py check`")
     for i in ids:                                    # сначала все отказы — потом запись
         tk = known.get(i)
         if tk is None:
             die("таска %s нет — сначала `ap.py tickets`" % i)
         refuse_ticket(tk, act, by_user, opt.get("commit") if isinstance(opt.get("commit"), str) else None)
+        rec = check_guard(state, tk, act, opt, by_user)
+        if rec and rec.get("tests"):
+            opt["tests"] = "%d/%d" % (rec["tests"]["passed"], rec["tests"]["failed"])
     notes = []
     for i in ids:
         tk = known[i]
@@ -3028,7 +3176,7 @@ def landing_problems(state):
         elif not tk.get("commit"):
             refuse.append("таск %s: сдан без коммита" % tk["id"])
     refuse += ["таск %s: коммита %s нет в истории" % pair for pair in lost_commits(state)]
-    refuse += ls_arch_landing(state)
+    refuse += ls_arch_landing(state) + check_landing(state)
     return refuse, caveat
 
 
@@ -3145,6 +3293,9 @@ def main():
         for line in PROJECT_COMMANDS[cmd](pos[1:], opt, multi):
             print("  " + (line if line.startswith("!") else "· " + line))
         return
+    if cmd == "check":                   # state.js только читает: таски проверяются и параллельно
+        cmd_check(pos[1:], opt)
+        return
     if cmd == "init":
         state, notes = cmd_init(opt)
     else:
@@ -3190,6 +3341,8 @@ def main():
         elif cmd in ("coverage", "blind"):
             cmd_numbers(state, cmd, rest, multi)
         elif cmd == "tests":
+            if state.get("evidence"):
+                die("число тестов вручную не пишется — `ap.py check branch`")
             state["tests"] = tests_pair(rest[0] if rest else "")
             log(state, "tests", **state["tests"])
         elif cmd == "ask":

@@ -79,7 +79,7 @@ class Base(unittest.TestCase):
         return next(s for s in self.state()["stages"] if s["id"] == sid)
 
     def init(self):
-        code, out = self.ap("init", "--slug", "repair-bot", "--title", "Бот", "--skill-dir", SKILL)
+        code, out = self.ap("init", "--slug", "repair-bot", "--title", "Бот", "--skill-dir", SKILL, "--evidence", "off")
         self.assertEqual(code, 0, out)
         self.dir = os.path.join(self.a, self.state()["dir"])
         return out
@@ -951,7 +951,7 @@ class Run(Base):
 
     def test_a_run_of_the_program_marks_its_row_from_init_to_finish(self):
         self.write_program()
-        code, out = self.ap("init", "--slug", "prompts", "--title", "Промпты", "--skill-dir", SKILL,
+        code, out = self.ap("init", "--slug", "prompts", "--title", "Промпты", "--skill-dir", SKILL, "--evidence", "off",
                             "--program", "P02")
         self.assertEqual(code, 0, out)
         s = self.state()
@@ -1059,6 +1059,157 @@ class Run(Base):
         self.assertEqual(self.state()["night"]["done"], ["02"])
 
 
+class Evidence(Base):
+    """Тесты запускает и записывает скрипт: руками «всё зелёное» не вписать."""
+
+    def setUp(self):
+        super().setUp()
+        code, out = self.ap("init", "--slug", "e", "--title", "Бот", "--skill-dir", SKILL)
+        self.assertEqual(code, 0, out)
+        self.dir = os.path.join(self.a, self.state()["dir"])
+        self.write("manifest.md", MANIFEST)
+        self.write("tickets/01-a.md", ticket("01", "Каркас", "R01, R02, R05", "—", ["src/"], 1))
+        self.ap("tickets")
+        self.ap("set", "checkCmd=echo 34 passed")
+        self.ap("ticket", "01", "start")
+        self.sha = self.commit()
+
+    def commit(self, name="a.txt", text="x", root=None):
+        root = root or self.root
+        with open(os.path.join(root, name), "w", encoding="utf-8") as f:
+            f.write(text)
+        for args in (["add", "-A"], ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", name]):
+            subprocess.run(["git", "-C", root] + args, capture_output=True)
+        return self.git("rev-parse", "--short", "HEAD").stdout.strip() if root == self.root else None
+
+    def record(self, target="01"):
+        return json.loads(read(os.path.join(self.dir, "checks", target + ".json")))
+
+    def done(self, *extra):
+        return self.ap("ticket", "01", "done", "--commit", self.sha, *extra)
+
+    def test_the_script_runs_the_tests_and_writes_down_the_code_it_saw(self):
+        before = read(os.path.join(self.a, "state.js"))
+        code, out = self.ap("check", "01")
+        self.assertEqual(code, 0, out)
+        self.assertIn("проверка 01 зелёная, 34/0", out)
+        rec = self.record()
+        self.assertEqual((rec["ok"], rec["tests"]), (True, {"passed": 34, "failed": 0}))
+        self.assertEqual(rec["tree"], self.git("rev-parse", "HEAD^{tree}").stdout.strip())
+        self.assertEqual(read(os.path.join(self.a, "state.js")), before)
+
+    def test_a_ticket_lands_only_on_a_green_record_and_takes_its_count(self):
+        code, out = self.done()
+        self.assertNotEqual(code, 0)
+        self.assertIn("тесты не запускались", out)
+        self.ap("check", "01")
+        code, out = self.done()
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.state()["tests"], {"passed": 34, "failed": 0})
+
+    def test_a_red_check_holds_the_ticket(self):
+        self.ap("set", "checkCmd=echo 3 failed, 31 passed; exit 1")
+        code, out = self.ap("check", "01")
+        self.assertNotEqual(code, 0)
+        self.assertIn("красная", out)
+        code, out = self.done()
+        self.assertNotEqual(code, 0)
+        self.assertIn("проверка красная", out)
+
+    def test_failures_count_even_when_the_command_exits_clean(self):
+        self.ap("set", "checkCmd=echo 2 failed, 5 passed")
+        self.assertNotEqual(self.ap("check", "01")[0], 0)
+
+    def test_changed_code_makes_the_check_stale(self):
+        self.ap("check", "01")
+        self.sha = self.commit("b.txt")
+        code, out = self.done()
+        self.assertNotEqual(code, 0)
+        self.assertIn("код изменился", out)
+
+    def test_the_count_cannot_be_typed_by_hand(self):
+        self.ap("check", "01")
+        code, out = self.done("--tests", "99/0")
+        self.assertNotEqual(code, 0)
+        self.assertIn("вручную не пишется", out)
+        code, out = self.ap("tests", "99/0")
+        self.assertNotEqual(code, 0)
+        self.assertIn("вручную не пишется", out)
+
+    def test_zero_tests_is_red_however_it_exits(self):
+        self.ap("set", "checkCmd=echo 0 passed")
+        self.assertNotEqual(self.ap("check", "01")[0], 0)
+        self.assertFalse(self.record()["ok"])
+
+    def test_output_it_cannot_read_falls_back_on_the_exit_code(self):
+        self.ap("set", "checkCmd=echo готово")
+        code, out = self.ap("check", "01")
+        self.assertEqual(code, 0, out)
+        self.assertIn("счётчик не разобран", out)
+        self.assertEqual(self.done()[0], 0)
+
+    def test_uncommitted_code_is_not_checked_but_our_own_files_do_not_count(self):
+        with open(os.path.join(self.root, "c.txt"), "w", encoding="utf-8") as f:
+            f.write("x")
+        code, out = self.ap("check", "01")
+        self.assertNotEqual(code, 0)
+        self.assertIn("c.txt", out)
+        os.remove(os.path.join(self.root, "c.txt"))
+        self.write("logs/01.md", "журнал")
+        self.assertEqual(self.ap("check", "01")[0], 0)
+
+    def test_only_the_owner_can_skip_the_check(self):
+        code, out = self.done("--no-check")
+        self.assertNotEqual(code, 0)
+        self.assertIn("словами владельца", out)
+        code, out = self.done("--no-check", "--by-user", "«диск сбоит, сдавай»")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.state()["tickets"][0]["noCheck"], "«диск сбоит, сдавай»")
+
+    def test_a_ticket_checked_in_its_own_copy_lands_after_a_clean_merge(self):
+        wt = tempfile.mkdtemp(prefix="ap-wt-")
+        shutil.rmtree(wt)
+        self.addCleanup(shutil.rmtree, wt, True)
+        self.git("worktree", "add", "-q", "-b", "t01", wt)
+        self.commit("feature.txt", root=wt)
+        code, out = self.ap("check", "01", "--cwd", wt)
+        self.assertEqual(code, 0, out)
+        self.git("merge", "-q", "--ff-only", "t01")
+        self.sha = self.git("rev-parse", "--short", "HEAD").stdout.strip()
+        code, out = self.done()
+        self.assertEqual(code, 0, out)
+
+    def test_a_prompt_ticket_runs_its_own_check_and_nothing_else(self):
+        self.write("tickets/02-p.md", ticket("02", "Промпт", "R02", "—", ["prompts/x/"], 2, model="opus", kind="prompt", effort="high"))
+        self.ap("tickets")
+        with open(os.path.join(self.root, "Makefile"), "w", encoding="utf-8") as f:
+            f.write("prompt-check:\n\t@echo 5 passed\n")
+        self.sha = self.commit("b.txt")
+        code, out = self.ap("check", "01", "--cmd", "make prompt-check STAGE=x")
+        self.assertNotEqual(code, 0)
+        code, out = self.ap("check", "02", "--cmd", "echo 5 passed")
+        self.assertNotEqual(code, 0)
+        code, out = self.ap("ticket", "02", "review", "--commit", self.sha)
+        self.assertIn("тесты не запускались", out)
+        code, out = self.ap("check", "02", "--cmd", "make prompt-check STAGE=x")
+        self.assertEqual(code, 0, out)
+        code, out = self.ap("ticket", "02", "review", "--commit", self.sha)
+        self.assertEqual(code, 0, out)
+
+    def test_the_run_is_not_finished_without_a_green_run_of_the_whole_branch(self):
+        self.assertIn("тесты всей ветки не запускались", self.ap("finish", "--result", "x")[1])
+        code, out = self.ap("check", "branch")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.state()["tests"], {"passed": 34, "failed": 0})
+        self.assertNotIn("тесты всей ветки", self.ap("finish", "--result", "x")[1])
+
+    def test_a_check_needs_a_command(self):
+        self.ap("set", "checkCmd=")
+        code, out = self.ap("check", "01")
+        self.assertNotEqual(code, 0)
+        self.assertIn("команды проверки нет", out)
+
+
 class Pure(unittest.TestCase):
     """Функции без процесса: опознание своего сервера и версия навыка."""
 
@@ -1067,6 +1218,27 @@ class Pure(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("ap", AP)
         cls.m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(cls.m)
+
+    def test_the_count_is_read_from_common_test_runners(self):
+        c = self.m.check_counts
+        self.assertEqual(c("= 3 failed, 31 passed, 2 skipped in 1.2s ="), {"passed": 31, "failed": 3})
+        self.assertEqual(c("=== 1 failed, 2 passed, 1 error in 3s ==="), {"passed": 2, "failed": 2})
+        self.assertEqual(c("Tests:       1 failed, 33 passed, 34 total\nSnapshots:   3 passed, 3 total"), {"passed": 33, "failed": 1})
+        self.assertEqual(c(" Test Files  1 passed (1)\n      Tests  \x1b[32m34 passed\x1b[39m (34)"), {"passed": 34, "failed": 0})
+        self.assertEqual(c("Ran 34 tests in 0.1s\n\nOK"), {"passed": 34, "failed": 0})
+        self.assertEqual(c("Ran 34 tests in 0.1s\n\nFAILED (failures=1, errors=2)"), {"passed": 31, "failed": 3})
+
+    def test_a_linter_after_the_tests_does_not_become_the_count(self):
+        self.assertEqual(self.m.check_counts("= 34 passed in 1s =\nFound 0 errors in 3 files\nAll checks passed!"),
+                         {"passed": 34, "failed": 0})
+        self.assertIsNone(self.m.check_counts("Found 0 errors\nAll checks passed!"))
+
+    def test_a_hung_check_is_stopped_with_its_children(self):
+        with mock.patch.object(self.m, "CHECK_TIMEOUT", 1):
+            code, out = self.m.check_capture("echo начало; sleep 30 & sleep 30", tempfile.gettempdir())
+        self.assertEqual(code, 124)
+        self.assertIn("начало", out)
+        self.assertIn("не уложилась", out)
 
     def test_is_ours(self):
         a = self.m.A
@@ -1634,7 +1806,7 @@ class Project(Base):
 
     def test_a_run_writes_its_dates_and_real_size(self):
         self.program()
-        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--program", "P02")
+        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--evidence", "off", "--program", "P02")
         self.dir = os.path.join(self.a, self.state()["dir"])
         self.write("manifest.md", MANIFEST)
         self.write("tickets/01-a.md", ticket("01", "Первый", "R01, R02, R05", "—", ["src/a/"], 1))
@@ -1647,7 +1819,7 @@ class Project(Base):
     def test_the_old_six_column_program_still_works(self):
         with open(os.path.join(self.a, "program.md"), "w", encoding="utf-8") as f:
             f.write("| ID | Прогон | Зависит от | Статус | Папка | Итог |\n|--|--|--|--|--|--|\n| P01 | Ядро | — | pending | — | — |\n")
-        self.ap("init", "--slug", "c", "--title", "Б", "--skill-dir", SKILL, "--program", "P01")
+        self.ap("init", "--slug", "c", "--title", "Б", "--skill-dir", SKILL, "--evidence", "off", "--program", "P01")
         row = next(x for x in read(os.path.join(self.a, "program.md")).splitlines() if x.startswith("| P01"))
         self.assertEqual(row.count("|"), 7)
 
@@ -1699,7 +1871,7 @@ class Project(Base):
 
     def test_the_page_follows_the_work(self):
         self.program()
-        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--program", "P02")
+        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--evidence", "off", "--program", "P02")
         self.dir = os.path.join(self.a, self.state()["dir"])
         self.write("manifest.md", MANIFEST)
         self.write("tickets/01-a.md", ticket("01", "Первый", "R01, R02, R05", "—", ["src/a/"], 1))
@@ -1800,7 +1972,7 @@ class Project(Base):
     def test_the_headline_of_a_landed_run_does_not_outlive_it(self):
         self.program()
         self.ap("project", "now", "--state", "Сдан первый")
-        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--program", "P02")
+        self.ap("init", "--slug", "chan", "--title", "Бот", "--skill-dir", SKILL, "--evidence", "off", "--program", "P02")
         self.assertIn("Идёт сейчас: Бот", self.page_data()["p"]["now"]["state"])
 
     def test_the_questions_hero_tells_the_truth_about_urgency(self):

@@ -4,7 +4,7 @@ description: Форк Autopilot для долгой, почти автономн
 disable-model-invocation: true
 argument-hint: "[full|semi|interview|manual] [strict|deep] [night] что нужно построить или путь к brief.md"
 metadata:
-  version: "2.2.3-ls.3"
+  version: "2.2.3-ls.4"
   upstream: "nick-vels/skills@5ed4b79 (Autopilot 2.2.3)"
 ---
 

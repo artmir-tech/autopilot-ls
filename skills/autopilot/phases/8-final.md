@@ -81,7 +81,7 @@ When `state.js` has `program` and the project has an accepted architecture: one 
 
 ## 3. The final report
 
-Run the check once more first, truncated, and record it — `ap.py tests N/M`. Then write, in the user's language, plain, no jargon.
+Run the check once more first — `ap.py check branch`; `finish` refuses without a green one. Then write, in the user's language, plain, no jargon.
 
 **Build it from the files, re-read now, not from memory.** By this phase your context is the most polluted of the run, and memory gets the report wrong in one direction: a `deferred` requirement reported as done, a placeholder vanishing, an `A##` nobody ordered turning up as though they had asked.
 

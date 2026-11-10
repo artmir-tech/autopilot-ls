@@ -24,7 +24,8 @@ Read when the run first writes one of the blocks below: in Phase 4 before `ap.py
 | Event | Call |
 |---|---|
 | a retry, before the fresh executor goes out | `ticket 03 retry` — prints `ретрай N: <model> · <effort>`, the rung from the ladder in `phases/5-repair.md`; launch on exactly that. `--model`/`--effort` override it only on the user's word |
-| a ticket lands | `ticket 03 done --tests 34/0 --gates "crap 7.4 · dry 0 · mutants 38/41" --base <sha> --commit <sha>` |
+| a ticket's code is committed | `check 03 --cwd "$WT"` — the script runs the tests and records the result |
+| a ticket lands | `ticket 03 done --gates "crap 7.4 · dry 0 · mutants 38/41" --base <sha> --commit <sha>` |
 | a prompt ticket reviewed clean, its page written | `ticket 03 await --page prompt-reviews/03-coach.html --gates "<EVAL>"` — `done` is then refused without `--by-user "«их слова»"`; their comments are `ticket 03 repair --note "…"` |
 | Phase 0, and whenever a `!` about the fork appears | `ls-check` — the `ub-mode` skill is installed, `.claude/worktrees/` in `.gitignore`, whether `make gates` exists yet. Not an event: it writes nothing to the log |
 
