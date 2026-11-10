@@ -32,8 +32,11 @@
 
 ## 3. The decision, per capability
 
+**The first question is whether this needs code at all.**
+
 | Decision | Means | Conditions |
 |---|---|---|
+| `configure` | no code at all: configure what is already there, or change the process | a `why` saying what exactly, and the requirements it closes; no candidates |
 | `adopt` | a dependency, used through a port of ours | license allows a dependency; alive; not `core` without the owner's words |
 | `adapt` | foreign code copied in and changed | license allows copying; **a spike first**; provenance in `THIRD_PARTY.md` |
 | `fork` | a foreign project as the base of ours | covers ≥ ~70 % of the live manifest rows, same stack, license allows copying, alive; **a spike first; the owner's words, in every mode** |

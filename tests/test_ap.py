@@ -655,6 +655,21 @@ class Run(Base):
         self.write("tickets/%s-s.md" % tid, ticket(tid, "Поиск", "R02", "02", ["src/s/"], 3) + line + "\n")
         return self.ap("check-plan")[1]
 
+    def test_a_ticket_is_not_reset_forever_without_the_owner(self):
+        self.plan()
+        self.ap("tickets")
+        for _ in range(2):
+            self.ap("ticket", "02", "start")
+            code, out = self.ap("ticket", "02", "reset")
+            self.assertEqual(code, 0, out)
+        self.ap("ticket", "02", "start")
+        code, out = self.ap("ticket", "02", "reset")
+        self.assertNotEqual(code, 0)
+        self.assertIn("два перезапуска без слов владельца", out)
+        code, out = self.ap("ticket", "02", "reset", "--by-user", "«давай ещё раз»")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(next(t for t in self.state()["tickets"] if t["id"] == "02")["resets"], 0)
+
     def test_check_plan_refuses_a_ticket_that_shrinks_the_task(self):
         self.plan()
         out = self.shrunk("03", "- [ ] В первой версии поиска нет")
@@ -1409,6 +1424,14 @@ class Scout(Base):
     def check(self, *caps):
         self.write_art(*caps)
         return self.ap("scout", "check")
+
+    def test_needing_no_code_is_a_decision_with_a_reason(self):
+        fine = self.capability("C1", "configure", candidates=[], choice=None, why="хватит настройки вебхука")
+        code, out = self.check(fine)
+        self.assertEqual(code, 0, out)
+        self.assertIn("берём готовым 1, пишем сами 0", out)
+        self.assertIn("решение без причины", self.check(dict(fine, why=""))[1])
+        self.assertIn("не названы требования", self.check(dict(fine, requirements=[]))[1])
 
     def test_a_clean_plan_passes_and_counts_what_we_take(self):
         code, out = self.check(self.capability(), self.capability("C2", "build", candidates=[], searched="искал очереди"))

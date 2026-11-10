@@ -808,7 +808,8 @@ def cmd_program(pos, opt, multi=None):
 # ── форк autopilot-ls: поиск готового (phases/2a-scout.md) ──────────────────
 
 PRIOR_ART = os.path.join(A, "prior-art.json")
-SCOUT_DECISIONS = ("adopt", "adapt", "fork", "learn", "build")
+SCOUT_DECISIONS = ("configure", "adopt", "adapt", "fork", "learn", "build")
+SCOUT_TAKEN = ("configure", "adopt", "adapt", "fork")   # своего кода по этой части не пишем
 # Что можно подключить зависимостью и что можно копировать в свой код. Всё остальное — только изучать.
 LICENSE_COPY = {"MIT", "BSD-2-Clause", "BSD-3-Clause", "Apache-2.0", "ISC", "0BSD", "Unlicense", "Zlib"}
 LICENSE_DEP = LICENSE_COPY | {"MPL-2.0", "LGPL-2.1", "LGPL-3.0", "PSF-2.0", "Python-2.0"}
@@ -937,6 +938,8 @@ def scout_capability_problems(c):
         out.append("%s: не названы требования, которые оно закрывает" % label)
     if not isinstance(c.get("core"), bool):
         out.append("%s: не сказано, отличает ли это продукт (core: true/false)" % label)
+    if decision == "configure":
+        return out
     if decision == "build":
         if not c.get("candidates") and not text_of(c.get("searched")):
             out.append("%s: пишем сами, а что искали — не сказано (searched)" % label)
@@ -994,7 +997,7 @@ def mirror_gate(gate, ok, **kw):
 
 def scout_counts(data):
     caps = data.get("capabilities") or []
-    taken = [c for c in caps if c.get("decision") in ("adopt", "adapt", "fork")]
+    taken = [c for c in caps if c.get("decision") in SCOUT_TAKEN]
     return {"capabilities": len(caps), "taken": len(taken), "own": len(caps) - len(taken)}
 
 
@@ -1656,7 +1659,7 @@ def publish_tickets(state):
     for p in files:
         t = parse_ticket(p)
         prev = old.get(t["id"], {})
-        for k in ("status", "startedAt", "finishedAt", "retries", "repairs", "repairFindings",
+        for k in ("status", "startedAt", "finishedAt", "retries", "repairs", "resets", "repairFindings",
                   "tests", "commit", "concerns") + LS_KEEP:
             if k in prev:
                 t[k] = prev[k]
@@ -2386,7 +2389,7 @@ def project_reuse():
         return None
     taken, own = [], []
     for c in data["capabilities"]:
-        (taken if c.get("decision") in ("adopt", "adapt", "fork") else own).append(
+        (taken if c.get("decision") in SCOUT_TAKEN else own).append(
             {"name": c.get("name") or c.get("id"), "why": c.get("why") or "", "choice": c.get("choice") or ""})
     return {"taken": taken, "own": own}
 
@@ -2845,6 +2848,9 @@ def refuse_ticket(tk, act, by_user, commit):
             return
         die("таск %s упал — дальше решает пользователь. Скажи ему, что блокирует, и жди ответа; "
             "перезапуск только по его словам: ticket %s reset --by-user \"<цитата>\"" % (i, i))
+    if act == "reset" and not by_user and tk.get("resets", 0) >= CAP:
+        die("таск %s: два перезапуска без слов владельца уже были — похоже, причина не случайна. "
+            "ticket %s fail --note \"что блокирует\" и вопрос пользователю" % (i, i))
     if act == "retry" and tk.get("retries", 0) >= CAP:
         die("таск %s: два свежих перезапуска уже были — третьего нет. "
             "ticket %s fail --note \"что блокирует\" и вопрос пользователю" % (i, i))
@@ -2900,7 +2906,9 @@ def cmd_ticket(state, pos, opt):
                 tk.pop(k, None)
             if by_user:
                 tk.setdefault("reopenedByUser", []).append(by_user)
-                tk["repairs"] = tk["retries"] = 0
+                tk["repairs"] = tk["retries"] = tk["resets"] = 0
+            else:
+                tk["resets"] = tk.get("resets", 0) + 1
         if act == "done":
             close_requirements(state, tk, opt, t)
             record_landing(tk, opt)
