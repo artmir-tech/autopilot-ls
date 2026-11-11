@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Автопилот для больших проектов в Claude Code — autopilot-ls</title>
-<meta name="description" content="Хочешь, чтобы ИИ построил продукт целиком, а не кусок кода? Расскажи идею своими словами. Дальше автопилот спланирует, построит и проверит сам.">
-<meta property="og:title" content="Автопилот для больших проектов в Claude Code">
-<meta property="og:description" content="Хочешь, чтобы ИИ построил продукт целиком, а не кусок кода? Расскажи идею своими словами. Дальше автопилот спланирует, построит и проверит сам.">
+<title>autopilot-ls — расскажи идею, ИИ построит продукт целиком</title>
+<meta name="description" content="Бот, сайт или сервис — от твоих слов до работающей вещи. Дополнение к Claude Code: план, роли, проверки и память, чтобы ИИ неделями вёл проект почти без тебя.">
+<meta property="og:title" content="Расскажи идею — ИИ построит продукт целиком">
+<meta property="og:description" content="Бот, сайт или сервис — от твоих слов до работающей вещи. Дополнение к Claude Code: план, роли, проверки и память, чтобы ИИ неделями вёл проект почти без тебя.">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#F2F2F4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#17181B" media="(prefers-color-scheme: dark)">
@@ -175,6 +175,76 @@ h2{font-size:clamp(28px,3.6vw,40px);line-height:1.1;font-weight:800;letter-spaci
 .rc .meter b{position:absolute;inset:0 auto 0 0;border-radius:4px}
 .rc b.s{font-weight:800;color:var(--tx);white-space:nowrap}
 
+/* три опоры */
+.pil{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:40px}
+.pc{display:flex;flex-direction:column}
+.pc .lbl{align-self:flex-start}
+.pc h3{margin-top:16px;font-size:26px;letter-spacing:-.02em}
+.pq{margin-top:2px;font-size:16.5px;font-weight:650;color:var(--tx2)}
+.risk{margin-top:12px;font-size:15px;color:var(--mut)}
+.tool{margin-top:14px;font-size:15.5px;color:var(--tx2)}
+.tool small,.gt small.h{display:block;font-size:11.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--mut);margin-bottom:4px}
+.pv{margin-top:auto;padding-top:20px}
+.pv-in{background:var(--inset);border-radius:16px;padding:14px 16px;display:grid;gap:10px;font-size:13.5px;color:var(--tx2)}
+.pv-row{display:flex;align-items:center;gap:10px}
+.dd{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12px;font-weight:800;background:var(--done-soft);color:var(--done-tx)}
+.dd.no{background:var(--now-soft);color:var(--now-tx)}
+.bar{flex:1;min-width:50px;height:8px;border-radius:4px;background:var(--card);position:relative;overflow:hidden}
+.bar b{position:absolute;inset:0 auto 0 0;border-radius:4px}
+.pv-row .v{font-weight:750;color:var(--tx);white-space:nowrap}
+
+/* чистый код */
+.cc{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.cc h2{margin-top:18px}
+.cc-lead{margin-top:16px;font-size:18px;color:var(--tx2)}
+.why{margin-top:28px;display:grid;gap:20px}
+.why>div{display:flex;gap:16px}
+.why h3{font-size:18px;line-height:1.3;font-weight:700;letter-spacing:-.01em}
+.why p{margin-top:4px;color:var(--mut);font-size:15.5px}
+.gt-row{display:grid;grid-template-columns:1fr auto;gap:6px 14px;align-items:center;padding:14px 0;border-top:1px solid var(--line)}
+.gt-row:first-of-type{border-top:0}
+.gt-row b{font-size:15px}
+.gt-row .v{display:flex;align-items:center;gap:8px;font-weight:750;font-size:14.5px;white-space:nowrap}
+.gt-row .bar{grid-column:1/-1;background:var(--inset)}
+.gt-row small{grid-column:1/-1;font-size:13px;color:var(--mut);line-height:1.45}
+.verdict{margin-top:6px;padding:13px 15px;border-radius:14px;background:var(--now-soft);color:var(--now-tx);font-weight:650;font-size:14.5px;line-height:1.4}
+.prn-t{margin-top:60px;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.prn{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:16px}
+.prn .card{padding:22px}
+.prn h3{font-size:16.5px}
+.prn p{font-size:14.5px}
+
+/* что понадобится */
+.need{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
+.need .card h3{margin-top:14px}
+.plans{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.plans span{padding:5px 10px;border-radius:999px;background:var(--inset);font-size:13px;font-weight:650;color:var(--tx2)}
+.plans span.rec{background:var(--accent-soft);color:var(--accent)}
+.who-tag{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;background:var(--inset);color:var(--mut)}
+.honest{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:start;background:var(--card);border:1px solid var(--line2);border-radius:26px;padding:30px 32px;box-shadow:var(--sh)}
+.honest .ico{background:var(--now-soft);color:var(--now-tx)}
+.honest h2{font-size:clamp(22px,2.6vw,28px)}
+.honest p{margin-top:10px;color:var(--tx2);font-size:16.5px}
+.more{margin-top:44px;background:transparent;border:0;box-shadow:none}
+.more>summary{display:inline-flex;gap:12px;padding:14px 22px;border-radius:999px;background:var(--card);border:1px solid var(--line2);box-shadow:var(--sh);font-size:16px}
+.more[open]>summary{margin-bottom:6px}
+.more .prn{margin-top:16px}
+.more .why-note{margin-top:14px;font-size:14.5px;color:var(--mut)}
+.tech{margin-top:10px;font-size:13px;color:var(--mut);line-height:1.5}
+.hood{margin-top:0}
+.hood>summary{font-size:clamp(20px,2.4vw,26px);font-weight:800;letter-spacing:-.02em;padding:26px 28px}
+.hood>summary small{display:block;font-size:15px;font-weight:500;color:var(--mut);letter-spacing:0;margin-top:4px}
+.hood-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;padding:0 24px 24px}
+.hood-grid div{background:var(--inset);border-radius:18px;padding:18px 20px}
+.hood-grid h3{font-size:16.5px;font-weight:750;letter-spacing:-.01em}
+.hood-grid p,.hood-grid li{margin-top:6px;font-size:14.5px;color:var(--tx2);line-height:1.55}
+.hood-grid ul{list-style:none;margin-top:4px}
+.hood-grid code{font-size:.88em}
+.hood-grid p,.more p.why-note{padding:0}
+.ask-cc{margin-top:14px;padding:14px 16px;border-radius:14px;background:var(--accent-soft);color:var(--tx);font-size:14.5px;line-height:1.5}
+.ask-cc b{color:var(--accent)}
+.mob-only{display:none}
+
 /* что получаешь */
 .get{display:grid;grid-template-columns:.9fr 1.1fr;gap:48px;align-items:center;margin-top:44px}
 .get-list{display:grid;gap:26px}
@@ -231,7 +301,7 @@ h2{font-size:clamp(28px,3.6vw,40px);line-height:1.1;font-weight:800;letter-spaci
 .start-grid>*,.grid>*,.trust>*,.get>*{min-width:0}
 .snum{width:34px;height:34px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-weight:800;margin-bottom:16px}
 .code{position:relative;margin-top:16px;background:var(--inset);border:1px solid var(--line);border-radius:16px;padding:16px 16px 16px 18px}
-.code pre{font:13.5px/1.7 var(--mono);white-space:pre;overflow-x:auto;color:var(--tx)}
+.code pre{font:13px/1.7 var(--mono);white-space:pre-wrap;word-break:break-all;color:var(--tx)}
 .copy{margin-top:12px;height:36px;padding:0 16px;border-radius:999px;border:1px solid var(--line2);background:var(--card);color:var(--tx);font:600 14px/1 var(--font);cursor:pointer}
 code{font-family:var(--mono);font-size:.92em;background:var(--inset);border:1px solid var(--line);border-radius:7px;padding:1px 6px;white-space:nowrap}
 
@@ -288,10 +358,15 @@ footer p+p{margin-top:8px}
   .row{grid-template-columns:1fr;gap:26px;padding:28px}
   .row:nth-child(even) .row-t{order:0}
   .src{grid-template-columns:1fr;gap:24px}
+  .need{grid-template-columns:repeat(2,1fr)}
+  .pil,.cc{grid-template-columns:1fr}
+  .cc{gap:36px}
+  .prn{grid-template-columns:repeat(2,1fr)}
   .chg{grid-template-columns:1fr}
 }
 @media (max-width:1100px){
   .start-grid{grid-template-columns:1fr}
+  .need{grid-template-columns:repeat(2,1fr)}
 }
 @media (max-width:760px){
   body{font-size:15.5px}
@@ -305,7 +380,9 @@ footer p+p{margin-top:8px}
   .stack .m{position:relative;width:100%;max-width:none;top:auto;left:auto;right:auto}
   .s1{transform:rotate(-.8deg)}.s2{transform:rotate(.8deg)}.s3{transform:none}
   .stack figcaption{bottom:0;right:auto;left:0}
-  section.sec{padding:68px 0}
+  section.sec{padding:54px 0}
+  .pain p{display:none}
+  .pain{padding-bottom:20px}
   .g3,.g2,.trust,.love-grid{grid-template-columns:1fr}
   .grid,.trust{margin-top:28px}
   .card{padding:22px}
@@ -316,6 +393,12 @@ footer p+p{margin-top:8px}
   .viz{padding:14px}
   .path{grid-template-columns:repeat(2,1fr)}
   .rep{grid-template-columns:1fr;row-gap:6px}
+  .prn{grid-template-columns:1fr}
+  .need,.hood-grid{grid-template-columns:1fr}
+  .hood-grid{padding:0 14px 14px}
+  .honest{grid-template-columns:1fr;padding:24px 20px}
+  .mob-only{display:block}
+  .pc h3{font-size:23px}
   .rep .k{margin-top:8px}
   .weeks{grid-template-columns:112px repeat(4,1fr);gap:0 10px}
   .win-body{padding:18px}
@@ -332,7 +415,7 @@ footer p+p{margin-top:8px}
 <header class="top">
   <div class="wrap">
     <a class="logo" href="#top"><b>ls</b>autopilot-ls</a>
-    <a class="btn primary sm" href="#start">Установить</a>
+    <a class="btn primary sm" href="#start">Как начать</a>
   </div>
 </header>
 
@@ -341,22 +424,22 @@ footer p+p{margin-top:8px}
 <section class="hero">
   <div class="wrap hero-grid">
     <div>
-      <span class="pill">Навык для Claude Code · бесплатно · открытый код</span>
-      <h1>Автопилот для больших проектов в Claude Code</h1>
-      <p class="lead">Хочешь, чтобы ИИ построил продукт целиком, а не кусок кода? Расскажи идею своими словами.</p>
-      <p class="sub">Дальше автопилот спланирует, построит и проверит сам. Ты видишь каждый шаг и решаешь только главное.</p>
+      <span class="pill">Дополнение к Claude Code · бесплатно · открытый код</span>
+      <h1>Расскажи идею — ИИ построит продукт целиком</h1>
+      <p class="lead">Бот, сайт или сервис — от твоих слов до работающей вещи. Ты отвечаешь на вопросы и видишь каждый шаг.</p>
+      <p class="sub">autopilot-ls дополняет Claude Code — программу, в которой ИИ пишет код на твоём компьютере. Автопилот даёт этому ИИ план, роли, проверки и память, чтобы он неделями вёл проект почти без тебя.</p>
       <div class="cta">
         <a class="btn primary" href="#start">Попробовать</a>
         <a class="btn ghost" href="https://github.com/artmir-tech/autopilot-ls">Посмотреть код</a>
       </div>
-      <p class="fine">Бесплатно · Открытый код · Работает на твоём компьютере</p>
+      <p class="fine"><a href="#need">Что понадобится и сколько стоит</a> · <a href="#hood" data-open="hood">Разработчику: под капотом</a></p>
     </div>
 
     <figure class="stack" aria-label="Пример страницы проекта">
       <div class="m s1">
         <div class="m-t">Проект</div>
         <div class="m-h">Бот записи к мастеру</div>
-        <div class="big"><b>45 %</b><span>сделано · этап 3 из 8</span></div>
+        <div class="big"><b>45 %</b><span>задач готово · этап 3 из 8</span></div>
         <div class="segs" aria-hidden="true"><i class="d"></i><i class="d"></i><i class="n"></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="m-row"><span class="tag now">Сейчас: кабинет мастера</span></div>
       </div>
@@ -369,7 +452,7 @@ footer p+p{margin-top:8px}
       <div class="m s3">
         <div class="ok">
           <div class="ok-i"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-          <div><b>Все проверки прошли</b><small>запустил автопилот, а не ИИ-исполнитель</small></div>
+          <div><b>Все проверки прошли</b><small>тесты запускал автопилот, а не ИИ, который писал код</small></div>
         </div>
       </div>
       <figcaption>Так выглядит страница твоего проекта</figcaption>
@@ -385,8 +468,8 @@ footer p+p{margin-top:8px}
       <div class="card pain"><h3>Через пару дней он забыл, о чём договорились.</h3><p>И снова объясняешь с начала.</p></div>
       <div class="card pain"><h3>Непонятно, сколько сделано и сколько осталось.</h3><p>«Почти готово» тянется неделями.</p></div>
       <div class="card pain"><h3>Новая правка ломает то, что уже работало.</h3><p>Шаг вперёд, два назад.</p></div>
-      <div class="card pain"><h3>Ушёл спать — утром всё стоит.</h3><p>ИИ остановился на первом же вопросе.</p></div>
-      <div class="card pain"><h3>Лимит подписки кончился, а результата нет.</h3><p>Токены ушли на круги на месте.</p></div>
+      <div class="card pain"><h3>Оставил ИИ одного — вернулся к бардаку.</h3><p>Он что-то переписал, и непонятно, что именно.</p></div>
+      <div class="card pain"><h3>Лимит подписки кончился, а результата нет.</h3><p>ИИ ходил по кругу и тратил лимит впустую.</p></div>
     </div>
     <p class="relief"><b>Дело не в тебе.</b> Обычному ИИ-помощнику не хватает процесса: плана, проверок и памяти. Автопилот добавляет их.</p>
   </div>
@@ -402,8 +485,8 @@ footer p+p{margin-top:8px}
         <div class="row-t"><div class="num">1</div><h3>Расскажи идею.</h3><p>Своими словами, как рассказал бы другу. Автопилот спросит только то, без чего не обойтись.</p></div>
         <div class="viz"><div class="chat">
           <div class="bub me"><small>Ты</small>Хочу бота, чтобы клиенты сами записывались к мастеру и не забывали прийти</div>
-          <div class="bub ap"><small>Автопилот</small>Понял. Записал твои слова как есть, получилось 9 требований. Один вопрос, без которого не обойтись: брать предоплату при записи?</div>
-          <div class="saved">Бриф сохранён дословно</div>
+          <div class="bub ap"><small>Автопилот</small>Понял. Сохранил твои слова дословно и разобрал на 3 пункта: запись, выбор мастера, напоминание. Один вопрос, без которого не обойтись: брать предоплату?</div>
+          <div class="saved">Твои слова сохранены дословно</div>
         </div></div>
       </div>
 
@@ -432,10 +515,10 @@ footer p+p{margin-top:8px}
       </div>
 
       <div class="row">
-        <div class="row-t"><div class="num">4</div><h3>Занимайся своими делами.</h3><p>ИИ-команда строит, проверяет и чинит сама, в том числе ночью. Раз в пару дней — список вопросов с готовыми ответами.</p></div>
+        <div class="row-t"><div class="num">4</div><h3>Занимайся своими делами.</h3><p>ИИ строит, проверяет и чинит сам. Можно оставить и на ночь: он возьмёт только то, что не требует твоих решений. Раз в пару дней — список вопросов с готовыми ответами.</p></div>
         <div class="viz"><div class="m">
           <div class="m-t">Утренний отчёт · ночь на 14 ноября</div>
-          <div class="nums"><div class="g"><b>3</b><span>сделано</span></div><div><b>0</b><span>упало</span></div><div class="o"><b>1</b><span>ждёт тебя</span></div></div>
+          <div class="nums"><div class="g"><b>3</b><span>сделано</span></div><div><b>0</b><span>ошибок</span></div><div class="o"><b>1</b><span>ждёт тебя</span></div></div>
           <div class="q" style="margin-top:14px">Показывать клиенту цену услуги до записи?</div>
           <div class="adv">Советую: да, меньше отказов на месте</div>
           <div class="m-btns"><span class="yes">Ок, как советуешь</span><span>Свой ответ</span></div>
@@ -449,7 +532,7 @@ footer p+p{margin-top:8px}
           <div class="rep">
             <div><span class="k ok">Готово</span><span>Клиент записывается сам, мастер видит расписание, напоминание приходит за день</span></div>
             <div><span class="k no">Не вошло</span><span>Предоплата: ты сказал «потом», она в плане следующего этапа</span></div>
-            <div><span class="k you">От тебя</span><span>Вписать токен бота: без него бот не ответит людям</span></div>
+            <div><span class="k you">От тебя</span><span>Создать бота в Телеграме и вписать его пароль — по шагам, пара минут</span></div>
           </div>
         </div></div>
       </div>
@@ -464,7 +547,7 @@ footer p+p{margin-top:8px}
     <div class="get">
       <div class="get-list">
         <div class="get-item"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></svg></div><div><h3>Работающий продукт, а не кусок кода.</h3><p>Бот, сайт или сервис, который можно открыть и дать людям.</p></div></div>
-        <div class="get-item"><div class="ico"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 13h8M8 16.5h5"/></svg></div><div><h3>Одну страницу со всем проектом.</h3><p>Сколько сделано, что идёт сейчас, что дальше. График на недели вперёд.</p></div></div>
+        <div class="get-item"><div class="ico"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 13h8M8 16.5h5"/></svg></div><div><h3>Одну страницу со всем проектом.</h3><p>Сколько задач готово, что идёт сейчас, что дальше. График на недели вперёд. Открывается в браузере.</p></div></div>
         <div class="get-item"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M20 12.5a7.5 7.5 0 0 1-11 6.6L4 20l1.1-4.3A7.5 7.5 0 1 1 20 12.5z"/><path d="M9.5 12.5l2 2 3.5-4"/></svg></div><div><h3>Вопросы, на которые легко ответить.</h3><p>У каждого — объяснение и совет. Согласен — одна кнопка.</p></div></div>
         <div class="get-item"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M10 12h5M10 15.5h5"/></svg></div><div><h3>Честный отчёт.</h3><p>Что готово, что не вошло и почему, что нужно от тебя. Без жаргона.</p></div></div>
       </div>
@@ -474,7 +557,7 @@ footer p+p{margin-top:8px}
           <div class="win-bar" aria-hidden="true"><i></i><i></i><i></i><span>Проект · бот записи к мастеру</span></div>
           <div class="win-body">
             <div class="win-top">
-              <div><div class="m-t">Сделано</div><div class="big"><b>45 %</b><span>этап 3 из 8</span></div></div>
+              <div><div class="m-t">Задач готово</div><div class="big"><b>45 %</b><span>этап 3 из 8</span></div></div>
               <span class="tag now">Сейчас: кабинет мастера</span>
             </div>
             <div class="gantt" aria-hidden="true">
@@ -494,16 +577,123 @@ footer p+p{margin-top:8px}
   </div>
 </section>
 
+<section class="sec" id="need" aria-labelledby="need-h" style="padding-top:24px">
+  <div class="wrap">
+    <div class="head"><h2 id="need-h">Что понадобится и сколько это стоит</h2><p>Сам автопилот бесплатный. Остальное — честно и заранее.</p></div>
+    <div class="need">
+      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10h18M7 15h4"/></svg></div><h3>Подписка Claude</h3><p>Pro хватит, чтобы попробовать, но работа будет часто ждать сброса лимита. Для проектов на недели — Max или Ultra.</p><div class="plans"><span>Pro · $20</span><span class="rec">Max · $100</span><span>Ultra · $200</span></div></div>
+      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div><h3>Компьютер</h3><p>Проверено на Mac. На Linux должно работать так же, на Windows пока не проверяли. Пока идёт сборка, компьютер включён, а Claude Code открыт.</p></div>
+      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg></div><h3>Сервер для готового</h3><p>Пока ИИ строит, всё живёт у тебя на компьютере. Чтобы бот работал круглосуточно, его выкладывают на сервер — это отдельная недорогая аренда. Наружу автопилот ничего не выкладывает без твоего «да».</p></div>
+      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></div><h3>Немного твоего времени</h3><p>В начале — разговор об идее и людях. Дальше раз в пару дней — список вопросов с готовыми ответами.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" aria-labelledby="pillars" style="padding-top:24px">
+  <div class="wrap">
+    <div class="head c"><h2 id="pillars">Продукт, архитектура, код: три уровня, и за каждым свой присмотр</h2><p>Обычно ИИ просто пишет код. Автопилот отвечает за три уровня сразу: что строим, как это устроено и как написано.</p></div>
+    <div class="pil">
+      <div class="card pc">
+        <span class="lbl mod">Продукт</span>
+        <h3>Что строим и для кого?</h3>
+        <p class="risk">Если ошибиться здесь, получится продукт, которым никто не хочет пользоваться.</p>
+        <div class="tool"><small>Чем закрыто</small>Разговор о людях до кода, карта того, что проходит человек, запреты и проход глазами новичка</div>
+        <div class="pv"><div class="pv-in">
+          <div class="pv-row"><span class="dd">✓</span><span>Карта опыта согласована</span></div>
+          <div class="pv-row"><span class="dd">✓</span><span>Запреты: 3, утвердил владелец</span></div>
+          <div class="pv-row"><span class="dd no">!</span><span>Новичок: 1 замечание в отчёт</span></div>
+        </div></div>
+      </div>
+      <div class="card pc">
+        <span class="lbl add">Архитектура</span>
+        <h3>Как это устроено?</h3>
+        <p class="risk">Если ошибиться здесь, через месяц всё придётся переделывать.</p>
+        <div class="tool"><small>Чем закрыто</small>Сначала поиск готовых решений. Потом один ИИ проектирует, а другой, не видевший его работы, придирчиво оценивает по 18 пунктам. Итог считает скрипт, нужно 9 из 10</div>
+        <div class="pv"><div class="pv-in">
+          <div class="pv-row"><span>Оценка</span><span class="bar"><b style="width:92%;background:var(--accent)"></b></span><span class="v">9,2 из 10</span></div>
+          <div class="pv-row"><span class="dd">✓</span><span>Подтвердил второй критик</span></div>
+          <div class="pv-row"><span class="dd">✓</span><span>2 части взяты готовыми</span></div>
+        </div></div>
+      </div>
+      <div class="card pc">
+        <span class="lbl imp">Код</span>
+        <h3>Как это написано?</h3>
+        <p class="risk">Если ошибиться здесь, каждая новая правка ломает старое.</p>
+        <div class="tool"><small>Чем закрыто</small>Правила чистого кода от Роберта Мартина и проверки программами, а не мнением ИИ, у каждой задачи</div>
+        <div class="pv"><div class="pv-in">
+          <div class="pv-row"><span class="dd">✓</span><span>Запутанность в норме</span></div>
+          <div class="pv-row"><span class="dd">✓</span><span>Повторов кода нет</span></div>
+          <div class="pv-row"><span class="dd">✓</span><span>Тесты поймали все 41 подброшенную ошибку</span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" aria-labelledby="clean" style="padding-top:24px">
+  <div class="wrap">
+    <div class="cc">
+      <div>
+        <span class="pill">Опора «Код»</span>
+        <h2 id="clean">Не просто работающий код, а чистый</h2>
+        <p class="cc-lead">Код пишется по ub-mode — стандарту Роберта Мартина, автора книги «Чистый код». Это не наш инструмент: мы встроили его в работу. Каждый ИИ-исполнитель и каждый ревьюер загружает его первым делом.</p>
+        <div class="why">
+          <div><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M4 17l5-5 4 4 7-8"/><path d="M15 8h5v5"/></svg></div><div><h3>Через месяц так же быстро, как в первую неделю.</h3><p>Новая функция добавляется за дни, а не продирается через завалы.</p></div></div>
+          <div><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></div><div><h3>Правка не ломает старое.</h3><p>Тесты сразу замечают, если что-то перестало работать.</p></div></div>
+          <div><div class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M16 11l2 2 3.5-4"/></svg></div><div><h3>Понятен другому.</h3><p>Разработчику-человеку или следующему ИИ: проект не привязан к одному исполнителю.</p></div></div>
+        </div>
+      </div>
+      <figure aria-label="Пример проверки качества">
+        <div class="m gt">
+          <small class="h">Проверки качества · задача 04</small>
+          <div class="gt-row"><b>Запутанность</b><span class="v">7,4 · порог 10 <span class="dd">✓</span></span><span class="bar"><b style="width:74%;background:var(--done)"></b></span><small>Насколько сложна самая запутанная функция и прикрыта ли она тестами.</small></div>
+          <div class="gt-row"><b>Повторы</b><span class="v">0 <span class="dd">✓</span></span><small>Одинаковые куски кода в разных местах: их потом правят в одном и забывают в другом.</small></div>
+          <div class="gt-row"><b>Подброшенные ошибки</b><span class="v">38 из 41 <span class="dd no">✕</span></span><span class="bar"><b style="width:92.7%;background:var(--now)"></b></span><small>В код специально вносят мелкие ошибки. Тесты обязаны заметить каждую.</small></div>
+          <div class="verdict">Задача вернулась на доработку: тесты не заметили 3 ошибки</div>
+        </div>
+        <figcaption class="note">Пример. Задача не сдаётся, пока все три проверки не зелёные.</figcaption>
+        <p class="tech">Для разработчиков: это CRAP, поиск дублей и мутационное тестирование — инструменты crapper, dryer и mutator. Проверки делают программы, а не модель. Готовая настройка — для Python; для других языков — аналоги вроде Stryker и jscpd, а чего нет, то честно помечается «не применимо».</p>
+      </figure>
+    </div>
+
+    <details class="more"><summary>Восемь правил, по которым пишет ИИ-исполнитель</summary>
+    <div class="prn">
+      <div class="card"><h3>Сначала тест.</h3><p>Каждый новый тест сначала должен упасть — иначе он ничего не проверяет.</p></div>
+      <div class="card"><h3>Сначала работает, потом красиво.</h3><p>Порядок наводится отдельным шагом, а не «потом как-нибудь».</p></div>
+      <div class="card"><h3>Меньше, а не больше.</h3><p>Прежде чем добавить, убрать лишнее.</p></div>
+      <div class="card"><h3>Невозможное невозможно.</h3><p>Запись без времени не может появиться даже по ошибке: так устроены данные.</p></div>
+      <div class="card"><h3>Проверка на входе.</h3><p>Всё, что пришло снаружи, проверяется один раз — там, где вошло.</p></div>
+      <div class="card"><h3>Повтор не ломает.</h3><p>Дважды нажатая кнопка не создаст две записи.</p></div>
+      <div class="card"><h3>Причина, а не симптом.</h3><p>Ошибку чинят там, где она возникла, а не прячут.</p></div>
+      <div class="card"><h3>Тесты про поведение.</h3><p>Проверяют то, что видит пользователь, поэтому не ломаются от каждой перестановки.</p></div>
+    </div>
+    <p class="why-note">Это правила для ИИ. Результат проверяет машина: тестами и тремя проверками выше.</p>
+    </details>
+  </div>
+</section>
+
 <section class="sec" aria-labelledby="trust" style="padding-top:24px">
   <div class="wrap">
     <div class="head"><h2 id="trust">Почему ему можно доверить недели работы</h2><p>Ошибки у ИИ будут. Автопилот устроен так, чтобы их ловить, а не прятать.</p></div>
     <div class="trust">
-      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Твои слова — эталон.</h3><p>Идея сохраняется дословно. В конце независимый проверяющий сверяет продукт с ней, не заглядывая в план, — так видно, если что-то потерялось по дороге.</p><div class="rc"><span class="d ok">✓</span><span>Слепая приёмка: <b class="s">9 из 9</b> требований брифа на месте</span></div></div></div>
-      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>«Готово» говорит проверка, а не ИИ.</h3><p>Тесты запускает сам автопилот. Без зелёной проверки задачу не сдать.</p><div class="rc"><span class="d no">✕</span><span>Задача 05 не сдана: <b class="s">тесты не запускались</b></span></div></div></div>
-      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Сначала продумано, потом построено.</h3><p>До первой строки кода один ИИ проектирует, другой, независимый, оценивает. Нужно 9 из 10.</p><div class="rc"><span>Архитектура</span><span class="meter"><b style="width:92%;background:var(--done)"></b></span><b class="s">9,2 из 10</b></div></div></div>
-      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Сначала ищет готовое.</h3><p>Если нужная часть уже есть в открытом доступе, возьмёт её, проверив лицензию, а не будет писать заново.</p><div class="rc"><span class="d ok">✓</span><span>Приём сообщений в Телеграме: <b class="s">готовая библиотека</b>, лицензия MIT</span></div></div></div>
-      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Решения остаются за тобой.</h3><p>Убрать то, что ты просил, потратить деньги, сделать необратимое — только с твоего согласия.</p><div class="rc"><span class="d no">?</span><span>Подключить платный сервис рассылок? <b class="s">Решаешь ты</b></span></div></div></div>
-      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Бережёт лимит.</h3><p>Простые задачи — быстрым моделям, сложные — сильным. Когда лимит на исходе, работа сама встаёт на паузу.</p><div class="rc"><span>Лимит</span><span class="meter"><b style="width:62%;background:var(--hero)"></b></span><b class="s">62 % · пауза на 85 %</b></div></div></div>
+      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Твои слова — эталон.</h3><span class="who-tag">Проверяет отдельный ИИ, не видевший плана</span><p>Идея сохраняется дословно. В конце независимый проверяющий сверяет продукт с ней, не заглядывая в план, — так видно, если что-то потерялось по дороге.</p><div class="rc"><span class="d ok">✓</span><span>Независимая проверка: <b class="s">3 из 3</b> пунктов твоей идеи на месте</span></div></div></div>
+      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>«Готово» говорит проверка, а не ИИ.</h3><span class="who-tag">Проверяет скрипт</span><p>Тесты запускает сам автопилот. Без зелёной проверки задачу не сдать.</p><div class="rc"><span class="d no">✕</span><span>Задача 05 не сдана: <b class="s">тесты не запускались</b></span></div></div></div>
+      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Сначала продумано, потом построено.</h3><span class="who-tag">Оценивает ИИ-критик, итог и порог считает скрипт</span><p>До первой строки кода один ИИ проектирует, другой, независимый, оценивает. Нужно 9 из 10.</p><div class="rc"><span>Архитектура</span><span class="meter"><b style="width:92%;background:var(--done)"></b></span><b class="s">9,2 из 10</b></div></div></div>
+      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Сначала ищет готовое.</h3><span class="who-tag">Лицензию сверяет скрипт по GitHub</span><p>Если нужная часть уже есть в открытом доступе, возьмёт её, проверив лицензию, а не будет писать заново.</p><div class="rc"><span class="d ok">✓</span><span>Приём сообщений в Телеграме: <b class="s">готовая библиотека</b>, лицензия MIT</span></div></div></div>
+      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Решения остаются за тобой.</h3><span class="who-tag">Решаешь ты</span><p>Убрать то, что ты просил, потратить деньги, сделать необратимое — только с твоего согласия.</p><div class="rc"><span class="d no">?</span><span>Подключить платный сервис рассылок? <b class="s">Решаешь ты</b></span></div></div></div>
+      <div class="tr"><div class="chk"><svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div><div><h3>Бережёт лимит.</h3><span class="who-tag">Расход берёт из приложения Claude Code</span><p>Простые задачи — быстрым моделям, сложные — сильным. Когда лимит на исходе, работа сама встаёт на паузу.</p><div class="rc"><span>Лимит</span><span class="meter"><b style="width:62%;background:var(--hero)"></b></span><b class="s">62 % · пауза на 85 %</b></div></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" aria-labelledby="honest" style="padding-top:24px">
+  <div class="wrap">
+    <div class="honest">
+      <div class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 16.5h.01"/></svg></div>
+      <div>
+        <h2 id="honest">Честно о том, где мы сейчас</h2>
+        <p>Форк молодой. Основа — Autopilot. Наши доработки покрыты 181 автоматическим тестом, и первая версия форка сейчас ведёт настоящую сборку Телеграм-бота длиной в несколько недель. Самые новые механизмы ещё не прошли долгую настоящую сборку. Когда она закончится, покажем здесь результат с цифрами: сколько дней, задач и лимита ушло.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -511,10 +701,10 @@ footer p+p{margin-top:8px}
 <section class="sec" aria-labelledby="love" style="padding-top:24px">
   <div class="wrap">
     <div class="love">
-      <h2 id="love">ПО, которое любит людей</h2>
+      <h2 id="love">Программы, которые любят людей</h2>
       <div class="love-grid">
         <div class="love-c"><small>Перед кодом</small><p>Отдельный разговор о тех, кто будет пользоваться продуктом: что их пугает, где они могут бросить, чего продукт не сделает с ними никогда.</p><div class="love-mini"><small>Никогда — пример из карты</small><ul><li>не спишет деньги без подтверждения</li><li>не напишет клиенту ночью</li><li>не потеряет запись, если оборвалась связь</li></ul></div></div>
-        <div class="love-c"><small>В конце</small><p>Проход глазами новичка: человек без контекста открывает готовое и говорит, где непонятно или неловко.</p><div class="love-mini"><small>Глазами новичка — пример</small>На выборе времени непонятно, что серые окна заняты: я трижды нажал на них и решил, что бот сломался.</div></div>
+        <div class="love-c"><small>В конце</small><p>Проход глазами новичка: отдельный ИИ, который ничего не знает о проекте, проходит готовое как новый человек и говорит, где непонятно или неловко.</p><div class="love-mini"><small>Глазами новичка — пример</small>На выборе времени непонятно, что серые окна заняты: я трижды нажал на них и решил, что бот сломался.</div></div>
       </div>
     </div>
   </div>
@@ -524,8 +714,8 @@ footer p+p{margin-top:8px}
   <div class="wrap">
     <div class="head c"><h2 id="who">Для кого</h2></div>
     <div class="grid g3">
-      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg></div><h3>У тебя есть идея, но ты не программист.</h3><p>Получишь работающую вещь, чтобы проверить идею на живых людях.</p></div>
-      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></svg></div><h3>Ты разработчик, и задач больше, чем времени.</h3><p>Отдашь проект на недели и займёшься тем, что важно.</p></div>
+      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1 1.2 1 2V16h5.2v-.2c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg></div><h3>У тебя есть идея, но ты не программист.</h3><p>Запись клиентов, заказы, напоминания, учёт — получишь работающую вещь для своего дела.</p></div>
+      <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M13.5 4.5l-3 15"/></svg></div><h3>Ты разработчик, и задач больше, чем времени.</h3><p>Отдашь задачу на недели — новую или в уже существующем проекте — и займёшься тем, что важно.</p></div>
       <div class="card"><div class="ico"><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.5"/><path d="M15.8 14.2c2.4.1 4.1 1.6 4.7 4.3"/></svg></div><h3>Ты отвечаешь за результат перед командой или клиентом.</h3><p>Будешь видеть, где проект, и не станешь узким местом.</p></div>
     </div>
     <p class="no">Не подойдёт, если хочешь писать код вместе с ИИ строчка за строчкой или нужна одна мелкая правка.</p>
@@ -536,14 +726,33 @@ footer p+p{margin-top:8px}
   <div class="wrap">
     <div class="head"><h2 id="start-h">Как начать</h2></div>
     <div class="start-grid">
-      <div class="card"><div class="snum">1</div><h3><a href="https://docs.anthropic.com/en/docs/claude-code/overview">Установи Claude Code.</a></h3><p>Это программа от Anthropic, в которой ИИ пишет код на твоём компьютере. Нужна подписка Claude; для проектов на недели — с большим лимитом.</p></div>
-      <div class="card"><div class="snum">2</div><h3>Поставь автопилот.</h3><p>Нужны Mac или Linux, Python 3 и git. Две команды в терминале:</p>
+      <div class="card"><div class="snum">1</div><h3><a href="https://docs.anthropic.com/en/docs/claude-code/overview">Установи Claude Code.</a></h3><p>Это программа от Anthropic, в которой ИИ пишет код на твоём компьютере. Нужна подписка Claude: Pro за $20, чтобы попробовать, Max или Ultra для проектов на недели.</p></div>
+      <div class="card"><div class="snum">2</div><h3>Поставь автопилот.</h3><p>Проверено на Mac. Нужны Python 3 и git: если их нет, Mac сам предложит поставить. Две команды в терминале:</p>
         <div class="code"><pre id="cmd">git clone -b ls https://github.com/artmir-tech/autopilot-ls
 cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
         <button class="copy" type="button" data-copy="cmd" hidden>Скопировать</button>
+        <div class="ask-cc"><b>Не работал с терминалом?</b> Открой Claude Code и напиши ему: «Поставь навык autopilot-ls: склонируй github.com/artmir-tech/autopilot-ls и запусти tools/install-ls.sh». Он сделает всё сам и спросит разрешения.</div>
+        <p class="mob-only" style="margin-top:12px;font-size:14px;color:var(--mut)">Ставится только на компьютер. С телефона сохрани ссылку на эту страницу.</p>
       </div>
       <div class="card"><div class="snum">3</div><h3>Расскажи идею.</h3><p>В Claude Code напиши <code>/autopilot-ls</code> и дальше своими словами, что хочешь получить.</p></div>
     </div>
+  </div>
+</section>
+
+<section class="sec" id="hood" aria-label="Под капотом" style="padding-top:8px">
+  <div class="wrap">
+    <details class="hood" id="hood-d"><summary><span>Под капотом — для разработчиков<small>Что ставится, что делает с git, кто что проверяет, как остановить</small></span></summary>
+      <div class="hood-grid">
+        <div><h3>Что ставится</h3><p>Копия навыка в <code>~/.claude/skills/autopilot-ls/</code> и навык ub-mode в <code>~/.claude/skills/ub-mode/</code>, если его ещё нет. Настройки, хуки и права доступа Claude Code установка не трогает. Удалить: <code>rm -rf ~/.claude/skills/autopilot-ls</code>.</p></div>
+        <div><h3>Что появляется в проекте</h3><p>Папка <code>.autopilot/</code>: бриф, требования, план, учёт и страница проекта. Строки в <code>.gitignore</code>. <code>AGENTS.md</code>, если своего файла памяти нет. Твой <code>CLAUDE.md</code> автопилот не правит, а только предлагает дополнения.</p></div>
+        <div><h3>Git</h3><p>Каждый исполнитель работает в своём <code>git worktree</code> и своей ветке. В твою текущую ветку задача попадает только перемоткой (<code>--ff-only</code>) после зелёной проверки. Ничего не пушит без твоего «да». Откат — <code>git revert</code> серии коммитов задачи: коммиты помечены прогоном и требованиями.</p></div>
+        <div><h3>Кто что проверяет</h3><ul><li><b>Скрипт</b> <code>ap.py</code>: учёт, больше ста отказов идти дальше, запуск тестов, итог оценки архитектуры, лицензии через GitHub.</li><li><b>Программы:</b> CRAP, дубли, мутации.</li><li><b>Claude:</b> исполнители, ревьюеры, архитектор и критики, слепая приёмка, новичок.</li><li><b>Другие компании:</b> только если сам включишь судью диалогов из другой модели.</li></ul></div>
+        <div><h3>Остановить и продолжить</h3><p>Останови чат когда угодно. <code>/autopilot-ls</code> без слов продолжит с того же места: всё состояние лежит в файлах, а не в памяти чата.</p></div>
+        <div><h3>Ночь и лимит</h3><p>Ночью работает локальная запланированная задача приложения Claude Code. Она создаётся только с твоего согласия, режим прав выбираешь ты. На первом сбое ночь останавливается. Расход пятичасового окна и недели берётся из приложения, после 85 % новое не запускается.</p></div>
+        <div><h3>Существующий проект</h3><p>Подойдёт. Сначала автопилот изучает код и записывает, как он устроен, и только потом планирует.</p></div>
+        <div><h3>Что дальше читать</h3><p>Что изменено и что проверено — в <a href="https://github.com/artmir-tech/autopilot-ls/blob/ls/CHANGES-ls.md">CHANGES-ls.md</a>. Правила каждого этапа — в папке навыка, по файлу на этап.</p></div>
+      </div>
+    </details>
   </div>
 </section>
 
@@ -551,13 +760,17 @@ cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
   <div class="wrap">
     <div class="head c"><h2 id="faq">Вопросы и ответы</h2></div>
     <div class="faq">
-      <details><summary>Нужно ли уметь программировать?</summary><p>Нет. Ты рассказываешь, отвечаешь на вопросы и принимаешь результат. Код пишет и проверяет ИИ. Понадобится только вставить две команды в терминал при установке.</p></details>
-      <details><summary>Сколько это стоит?</summary><p>Автопилот бесплатный, код открыт. Платишь только за свою подписку Claude.</p></details>
+      <details><summary>Нужно ли уметь программировать?</summary><p>Нет. Ты рассказываешь, отвечаешь на вопросы и принимаешь результат. Код пишет и проверяет ИИ. Даже установку можно поручить самому Claude Code.</p></details>
+      <details><summary>Что такое «чистый код» и зачем он мне, если я не программист?</summary><p>Чистый код легко менять. Через месяц новая функция добавляется так же быстро, как в начале, и правка не ломает то, что уже работало. Ты видишь это по скорости и по тому, что ничего не отваливается.</p></details>
+      <details><summary>Сколько это стоит?</summary><p>Автопилот бесплатный, код открыт. Нужна подписка Claude: Pro за $20 в месяц хватит, чтобы попробовать, но работа будет часто ждать сброса лимита. Для проектов на недели — Max за $100 или Ultra за $200. Если продукт должен работать круглосуточно, добавится аренда сервера.</p></details>
       <details><summary>Что можно построить?</summary><p>Телеграм-бота, сайт, веб-сервис — то, что работает как программа. Большой продукт делится на этапы по несколько дней.</p></details>
       <details><summary>Сколько времени это займёт?</summary><p>От нескольких часов до нескольких недель. Срок покажет план, который ты получишь в начале.</p></details>
       <details><summary>А если ИИ ошибётся?</summary><p>Ошибётся, и не раз. Поэтому каждую задачу проверяют тесты, важные — отдельный ревьюер, а в конце — независимая приёмка по твоим словам. Что не получилось, честно попадает в отчёт.</p></details>
-      <details><summary>Куда уходят мой код и данные?</summary><p>Работа идёт на твоём компьютере, в Claude Code. Сам автопилот твой код никуда не отправляет. Пароли и ключи он не запрашивает и не записывает.</p></details>
-      <details><summary>Можно оставить его работать ночью?</summary><p>Да. Ночью он берёт только задачи, которым не нужны твои решения, останавливается на первом сбое, а утром пишет отчёт.</p></details>
+      <details><summary>Куда уходят мой код и данные?</summary><p>Код видит Claude — так же, как при обычной работе в Claude Code: это сервис компании Anthropic. Сам автопилот больше никуда его не отправляет. Поиск готового ищет на GitHub по названию задачи, а не по твоему коду. Модель другой компании подключается, только если ты сам включишь ею проверку диалогов. Пароли и ключи автопилот не запрашивает и не записывает.</p></details>
+      <details><summary>Можно оставить его работать ночью?</summary><p>Да, если разрешишь. Ночью он берёт только задачи, которым не нужны твои решения, и останавливается на первом сбое, чтобы не наломать дров. Утром — отчёт. Компьютер при этом включён, а приложение Claude Code открыто.</p></details>
+      <details><summary>Нужно ли держать компьютер включённым? Где будет работать готовый бот?</summary><p>Пока идёт сборка — да, всё строится на твоём компьютере. Готовый бот или сайт, чтобы работать круглосуточно, выкладывают на сервер: это отдельная недорогая аренда. Наружу автопилот ничего не выкладывает без твоего «да».</p></details>
+      <details><summary>Работает на Windows?</summary><p>Проверено на Mac. На Linux должно работать так же. Windows пока не проверяли.</p></details>
+      <details><summary>Подойдёт для уже существующего проекта?</summary><p>Да. Сначала автопилот изучит код и запишет, как он устроен, и только потом начнёт планировать.</p></details>
       <details><summary>Чем это отличается от обычного Claude Code?</summary><p>Claude Code — умный исполнитель. Автопилот — процесс вокруг него: план, роли, проверки, память между сессиями и страница проекта.</p></details>
     </div>
   </div>
@@ -566,9 +779,9 @@ cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
 <section class="sec" aria-labelledby="go" style="padding-top:24px">
   <div class="wrap">
     <div class="final">
-      <h2 id="go">Расскажи идею — остальное возьмёт на себя автопилот.</h2>
+      <h2 id="go">Расскажи идею — план, код и проверки автопилот возьмёт на себя.</h2>
       <div class="cta">
-        <a class="btn white" href="#start">Установить</a>
+        <a class="btn white" href="#start">Как начать</a>
         <a class="btn line" href="https://github.com/artmir-tech/autopilot-ls">Код на GitHub</a>
       </div>
     </div>
@@ -602,7 +815,7 @@ cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
         <span class="lbl add">Добавили</span>
         <ul>
           <li><b>Поиск готового.</b> На GitHub, с проверкой лицензий и того, жив ли проект.</li>
-          <li><b>Архитектуру до кода.</b> Архитектор, независимый критик, порог 9 из 10, судья против вкусовщины.</li>
+          <li><b>Архитектуру до кода.</b> Один ИИ проектирует, другой оценивает, нужно 9 из 10; судья отсеивает замечания на вкус.</li>
           <li><b>План на недели.</b> Несколько этапов, график, страница проекта и страница решений.</li>
           <li><b>Разговор о людях.</b> Для кого продукт, и проход глазами новичка в конце.</li>
           <li><b>Ночную очередь.</b> Работа без тебя и утренний отчёт.</li>
@@ -613,9 +826,9 @@ cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
         <span class="lbl mod">Изменили</span>
         <ul>
           <li><b>Модель под задачу.</b> Своя модель и усилие у каждой задачи, сильнее — если не вышло с первого раза.</li>
-          <li><b>Своя копия кода.</b> Каждый исполнитель работает отдельно и сдаёт только свои файлы.</li>
+          <li><b>Своя копия кода.</b> Каждый исполнитель работает в отдельной копии (git worktree) и сдаёт только свои файлы.</li>
           <li><b>«Готово» решает скрипт.</b> Тесты запускает он, а не исполнитель.</li>
-          <li><b>Риск, а не только размер.</b> Деньги, доступы и данные всегда идут полным путём.</li>
+          <li><b>Риск, а не только размер.</b> Если задача касается денег, доступов или данных, поиск готового и проверку архитектуры не пропустить, даже если она маленькая.</li>
         </ul>
       </div>
       <div class="card">
@@ -623,8 +836,8 @@ cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
         <ul>
           <li><b>Чистый код.</b> Стандарт ub-mode Роберта Мартина и автоматические пороги сложности, повторов и силы тестов.</li>
           <li><b>Бережнее к лимиту.</b> Темп по пятичасовому окну и неделе, пауза до того, как лимит кончится.</li>
-          <li><b>Строже к правилам.</b> Скрипт отказывает больше чем в ста местах, решения владельца — только его словами.</li>
-          <li><b>Спецификацию.</b> Запреты, края данных и пункты, которые без теста не засчитываются.</li>
+          <li><b>Строже к правилам.</b> Больше ста мест, где скрипт учёта отказывается идти дальше; решения владельца — только его словами.</li>
+          <li><b>Спецификацию.</b> Запреты, крайние случаи (пусто, длина, повтор) и пункты, которые без теста не засчитываются.</li>
         </ul>
       </div>
     </div>
@@ -636,11 +849,14 @@ cd autopilot-ls &amp;&amp; tools/install-ls.sh</pre></div>
 <footer>
   <div class="wrap">
     <p>autopilot-ls — форк <a href="https://github.com/nick-vels/skills">Autopilot</a> Nick Vels, лицензия MIT. Стандарт кода — <a href="https://github.com/unclebob/ub-mode">ub-mode</a> Роберта Мартина.</p>
-    <p>Честно: форк развивается, и часть механизмов пока проверена автоматическими тестами, а не долгой настоящей сборкой. Что изменено и что проверено — в <a href="https://github.com/artmir-tech/autopilot-ls/blob/ls/CHANGES-ls.md">CHANGES-ls.md</a>.</p>
+    <p>Что изменено и что проверено — в <a href="https://github.com/artmir-tech/autopilot-ls/blob/ls/CHANGES-ls.md">CHANGES-ls.md</a>.</p>
   </div>
 </footer>
 
 <script>
+function openHood() { var d = document.getElementById('hood-d'); if (d) d.open = true; }
+if (location.hash === '#hood') openHood();
+document.querySelectorAll('[data-open="hood"]').forEach(function (a) { a.addEventListener('click', openHood); });
 document.querySelectorAll('[data-copy]').forEach(function (b) {
   b.hidden = false;
   b.addEventListener('click', function () {
