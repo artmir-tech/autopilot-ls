@@ -1,3 +1,5 @@
+> 🌐 **[Project page — what it is, who it is for, how to start](https://artmir-tech.github.io/autopilot-ls/)** (in Russian)
+>
 > **This is `autopilot-ls`**, a fork of Autopilot for projects of many weeks that run nearly unattended: prior-art search, architecture audited to 9 of 10, a master plan with a Gantt, one report for the whole project and a page of owner decisions. What differs and how to install: [CHANGES-ls.md](CHANGES-ls.md). Trigger: `/autopilot-ls`. The rest of this README describes upstream Autopilot.
 
 <p align="center">
